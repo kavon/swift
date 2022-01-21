@@ -868,11 +868,10 @@ public:
   /// because their prolog emission is not the same as for regular functions.
   ///
   /// This function emits the appropriate hop_to_executor for a constructor's
-  /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
+  /// prologue. This includes actors.
   void emitConstructorPrologActorHop(SILLocation loc,
-                                     Optional<ActorIsolation> actorIso);
+                                     ConstructorDecl *ctor,
+                                     SILValue self);
 
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
