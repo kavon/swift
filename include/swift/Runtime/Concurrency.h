@@ -733,6 +733,10 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
+/// Extract the task from a block, if the block is associated with one.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask* swift_extract_task_from_block(void* block);
+
 /// Initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
