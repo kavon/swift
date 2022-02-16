@@ -188,6 +188,7 @@ public:
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
       CanSILFunctionType blockType, CanType continuationTy,
+      CanSILBlockStorageType blockStorageType,
       AbstractionPattern origFormalType, CanGenericSignature sig,
       ForeignAsyncConvention convention,
       Optional<ForeignErrorConvention> foreignError);
