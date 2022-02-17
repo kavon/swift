@@ -198,7 +198,6 @@ static const clang::Type *prependParameterType(
 
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     CanSILFunctionType blockType, CanType continuationTy,
-    CanSILBlockStorageType blkStorageTy,
     AbstractionPattern origFormalType, CanGenericSignature sig,
     ForeignAsyncConvention convention,
     Optional<ForeignErrorConvention> foreignError) {
@@ -225,7 +224,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   // block buffer. The block storage holds the continuation we feed the
   // result values into.
   SmallVector<SILParameterInfo, 4> implArgs;
-  implArgs.push_back(SILParameterInfo(blkStorageTy,
+  auto blockStorageTy = SILBlockStorageType::get(continuationTy);
+  implArgs.push_back(SILParameterInfo(blockStorageTy,
                                 ParameterConvention::Indirect_InoutAliasable));
   
   std::copy(blockType->getParameters().begin(),
@@ -235,7 +235,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   auto newClangTy = prependParameterType(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
-      getASTContext().getClangTypeForIRGen(blkStorageTy));
+      getASTContext().getClangTypeForIRGen(blockStorageTy));
 
   auto implTy = SILFunctionType::get(sig,
          blockType->getExtInfo().intoBuilder()
@@ -279,8 +279,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       // Get the continuation out of the block object.
       auto blockStorage = params[0].getValue();
-      auto storageAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-      auto continuationAddr = SGF.B.createTupleElementAddr(loc, storageAddr, 0);
+      auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
       auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
                                            LoadOwnershipQualifier::Trivial);
       auto continuation = ManagedValue::forUnmanaged(continuationVal);

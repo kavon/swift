@@ -498,7 +498,6 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILType opaqueResumeType;
   SILValue resumeBuf;
   SILValue continuation;
-  SILValue optForwardingBox;
   
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
@@ -534,71 +533,25 @@ public:
 
     // Wrap the Builtin.RawUnsafeContinuation in an
     // UnsafeContinuation<T, E>.
-    auto &ctx = SGF.getASTContext();
-    auto continuationDecl = ctx.getUnsafeContinuationDecl();
+    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
 
-    auto errorTy = throws ? ctx.getErrorExistentialType() : ctx.getNeverType();
+    auto errorTy = throws
+      ? SGF.getASTContext().getErrorExistentialType()
+      : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                    { calleeTypeInfo.substResultType, errorTy })
-                            ->getCanonicalType();
-
-    // Set-up for forwarding function
-    auto env = SGF.F.getGenericEnvironment();
-    auto sig = env ? env->getGenericSignature().getCanonicalSignature()
-                   : CanGenericSignature();
-
-    // FIXME: does this need to be marked @escaping somehow or no?
-    auto extInfo = ASTExtInfo().intoBuilder().withAsync();
-    if (throws)
-      extInfo = extInfo.withThrows();
-
-    SILType forwardingTy = SGF.getLoweredType(
-                          FunctionType::get({}, calleeTypeInfo.substResultType)
-                            ->withExtInfo(extInfo.build())
-                            ->mapTypeOutOfContext());
-
-    SILType optForwardingTy = SILType::getOptionalType(forwardingTy);
-
-    // FIXME: might be wrong ownership
-    auto optForwardingAllocTy =
-            optForwardingTy.getReferenceStorageType(ctx,
-                                                    ReferenceOwnership::Unmanaged);
-
-    CanType storagePairTy =
-          TupleType::get({continuationTy, optForwardingAllocTy.getASTType()},
-                         SGF.getASTContext())
-            ->mapTypeOutOfContext()
-            ->getCanonicalType(sig);
-
+                                                { calleeTypeInfo.substResultType, errorTy })
+      ->getCanonicalType();
     auto wrappedContinuation =
         SGF.B.createStruct(loc,
                            SILType::getPrimitiveObjectType(continuationTy),
                            {continuation});
 
-    // Initialize the forwarding function to none
-    CanSILBoxType boxTy = SILBoxType::get(optForwardingTy.getASTType());
-    optForwardingBox = SGF.B.createAllocBox(loc, boxTy);
-    auto optForwardingAddr = SGF.B.createProjectBox(loc, optForwardingBox, 0);
-    SGF.B.createInjectEnumAddr(loc, optForwardingAddr,
-                               ctx.getOptionalNoneDecl());
-
-    // Stash the pair in a buffer for a block object.
-    CanSILBlockStorageType canBlockStorageTy =
-        SILBlockStorageType::get(storagePairTy);
-    auto blockStorageTy = SILType::getPrimitiveAddressType(canBlockStorageTy);
+    // Stash it in a buffer for a block object.
+    auto blockStorageTy = SILType::getPrimitiveAddressType(
+        SILBlockStorageType::get(continuationTy));
     auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
-    auto storageAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-
-    // Stash the continuation into the block object
-    auto continuationAddr = SGF.B.createTupleElementAddr(loc, storageAddr, 0);
+    auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
     SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
-                      StoreOwnershipQualifier::Trivial);
-
-
-    // Store a reference to the forwarding function storage into the header.
-    auto optFwdTupleAddr = SGF.B.createTupleElementAddr(loc, storageAddr, 1);
-    // FIXME: store is busted here. probably wrong way to deal with addr
-    SGF.B.createStore(loc, optForwardingAddr, optFwdTupleAddr,
                       StoreOwnershipQualifier::Trivial);
 
     // Get the block invocation function for the given completion block type.
@@ -616,12 +569,14 @@ public:
       handlerIsOptional = false;
       impFnTy = cast<SILFunctionType>(impTy.getASTType());
     }
+    auto env = SGF.F.getGenericEnvironment();
+    auto sig = env ? env->getGenericSignature().getCanonicalSignature()
+                   : CanGenericSignature();
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
                 impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
             continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
-            canBlockStorageTy,
             origFormalType, sig, *calleeTypeInfo.foreign.async,
             calleeTypeInfo.foreign.error);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
@@ -647,7 +602,8 @@ public:
                 SILValue bridgedForeignError) override {
     // There should be no direct results from the call.
     assert(directResults.empty());
-
+    
+    // Await the continuation we handed off to the completion handler.
     SILBasicBlock *resumeBlock = SGF.createBasicBlock();
     SILBasicBlock *errorBlock = nullptr;
     bool throws =
@@ -658,31 +614,6 @@ public:
       errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
     }
 
-    // Check if the foreign function passed-back a function that forwards to
-    // a native async function.
-    auto &ctx = SGF.getASTContext();
-    SILBasicBlock *haveForwardingBB = SGF.createBasicBlock();
-    SILBasicBlock *noForwardingBB = SGF.createBasicBlock();
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 2> caseBBs = {
-      std::make_pair(ctx.getOptionalSomeDecl(), haveForwardingBB),
-      std::make_pair(ctx.getOptionalNoneDecl(), noForwardingBB)
-    };
-
-    auto optForwardingAddr = SGF.B.createProjectBox(loc, optForwardingBox, 0);
-    SGF.B.createSwitchEnumAddr(loc, optForwardingAddr, nullptr, caseBBs);
-
-    // FIXME: we need a "cancel_get_continuation" instruction that
-    // reenters the task instead of marking it as ready for resumption
-    // by someone else.
-    SGF.B.setInsertionPoint(haveForwardingBB);
-    SGF.B.emitDestroyOperation(loc, optForwardingBox); // TEMPORARY
-    SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
-
-    // Emit into the non-forwarding block first.
-    SGF.B.setInsertionPoint(noForwardingBB);
-    SGF.B.emitDestroyOperation(loc, optForwardingBox); // destroy box
-    
-    // Await the continuation we handed off to the completion handler.
     auto *awaitBB = SGF.B.getInsertionBB();
     if (bridgedForeignError) {
       // Avoid a critical edge from the block which branches to the await and
