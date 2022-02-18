@@ -4373,6 +4373,7 @@ bool Parser::isStartOfSILDecl() {
     // SIL decls must start on a new line.
     return Tok.isAtStartOfLine();
   case tok::kw_undef:
+  case tok::kw_bridging:
   case tok::NUM_TOKENS:
     return false;
 #define SIL_KEYWORD(Name)

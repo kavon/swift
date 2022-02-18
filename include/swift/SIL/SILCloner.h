@@ -3042,7 +3042,8 @@ void SILCloner<ImplClass>
                           getBuilder().createGetAsyncContinuation(
                             getOpLocation(Inst->getLoc()),
                             getOpASTType(Inst->getFormalResumeType()),
-                            Inst->throws()));
+                            Inst->throws(),
+                            Inst->bridging()));
 }
 
 template <typename ImplClass>
@@ -3054,7 +3055,8 @@ void SILCloner<ImplClass>
                             getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getOperand()),
                             getOpASTType(Inst->getFormalResumeType()),
-                            Inst->throws()));
+                            Inst->throws(),
+                            Inst->bridging()));
 }
 
 template <typename ImplClass>

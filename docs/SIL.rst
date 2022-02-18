@@ -3319,10 +3319,12 @@ get_async_continuation
 
 ::
 
-  sil-instruction ::= 'get_async_continuation' '[throws]'? sil-type
+  sil-instruction ::= 'get_async_continuation' '[throws]'? '[bridging]'? sil-type
 
   %0 = get_async_continuation $T
   %0 = get_async_continuation [throws] $U
+  %0 = get_async_continuation [bridging] $U
+  %0 = get_async_continuation [throws] [bridging] $U
 
 Begins a suspension of an ``@async`` function. This instruction can only be
 used inside an ``@async`` function. The result of the instruction is an
@@ -3347,8 +3349,13 @@ has the ``[throws]`` attribute, it can also be resumed in an error state, in
 which case the matching ``await_async_continuation`` instruction must also
 have an ``error`` successor.
 
+If the instruction is marked with ``[bridging]`` then it will obtain a
+continuation designed to be used for bridging with Objective-C completion-handler
+function. In addition, the corresponding ``await_async_continuation`` instruction must also
+be marked for ``[bridging]`` if this instruction is marked as such.
+
 Within the enclosing SIL function, the result continuation is consumed by the
-``await_async_continuation``, and cannot be referenced after the
+``await_async_continuation`` and cannot be referenced after the
 ``await_async_continuation`` executes. Dynamically, the continuation value must
 be resumed exactly once in the course of the program's execution; it is
 undefined behavior to resume the continuation more than once. Conversely,
@@ -3360,10 +3367,11 @@ get_async_continuation_addr
 
 ::
 
-  sil-instruction ::= 'get_async_continuation_addr' '[throws]'? sil-type ',' sil-operand
+  sil-instruction ::= 'get_async_continuation_addr' '[throws]'? '[bridging]'? sil-type ',' sil-operand
 
   %1 = get_async_continuation_addr $T, %0 : $*T
   %1 = get_async_continuation_addr [throws] $U, %0 : $*U
+  %1 = get_async_continuation_addr [throws] [bridging] $U, %0 : $*U
 
 Begins a suspension of an ``@async`` function, like ``get_async_continuation``,
 additionally binding a specific memory location for receiving the value

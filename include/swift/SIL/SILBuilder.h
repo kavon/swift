@@ -2126,26 +2126,30 @@ public:
 
   GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
                                                        CanType ResumeType,
-                                                       bool Throws) {
+                                                       bool Throws,
+                                                       bool ForBridging) {
     auto ContinuationType = SILType::getPrimitiveObjectType(
         getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
                                                              ContinuationType,
                                                              ResumeType,
-                                                             Throws));
+                                                             Throws,
+                                                             ForBridging));
   }
 
   GetAsyncContinuationAddrInst *createGetAsyncContinuationAddr(SILLocation Loc,
                                                                SILValue Operand,
                                                                CanType ResumeType,
-                                                               bool Throws) {
+                                                               bool Throws,
+                                                               bool ForBridging) {
     auto ContinuationType = SILType::getPrimitiveObjectType(
         getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationAddrInst(getSILDebugLocation(Loc),
                                                                  Operand,
                                                                  ContinuationType,
                                                                  ResumeType,
-                                                                 Throws));
+                                                                 Throws,
+                                                                 ForBridging));
   }
 
   HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor,

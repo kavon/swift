@@ -529,7 +529,8 @@ public:
         calleeTypeInfo.foreign.error.hasValue();
 
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
-                               calleeTypeInfo.substResultType, throws);
+                               calleeTypeInfo.substResultType, throws,
+                                                        /*bridging*/ true);
 
     // Wrap the Builtin.RawUnsafeContinuation in an
     // UnsafeContinuation<T, E>.

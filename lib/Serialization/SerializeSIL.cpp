@@ -1699,14 +1699,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
     auto &gaca = cast<GetAsyncContinuationAddrInst>(SI);
-    writeOneTypeOneOperandLayout(gaca.getKind(), gaca.throws(),
+    unsigned attrs = 0;
+    attrs |= gaca.throws()    ? 1<<0 : 0;
+    attrs |= gaca.bridging()  ? 1<<1 : 0;
+    writeOneTypeOneOperandLayout(gaca.getKind(), attrs,
                                  gaca.getFormalResumeType(),
                                  gaca.getOperand());
     break;
   }
   case SILInstructionKind::GetAsyncContinuationInst: {
     auto &gaca = cast<GetAsyncContinuationInst>(SI);
-    writeOneTypeLayout(gaca.getKind(), gaca.throws(),
+    unsigned attrs = 0;
+    attrs |= gaca.throws()    ? 1<<0 : 0;
+    attrs |= gaca.bridging()  ? 1<<1 : 0;
+    writeOneTypeLayout(gaca.getKind(), attrs,
                        gaca.getFormalResumeType());
     break;
   }

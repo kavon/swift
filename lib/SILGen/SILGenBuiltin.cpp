@@ -1538,7 +1538,8 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   // Capture the current continuation.
   auto continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                                            substResultType,
-                                                           throws);
+                                                           throws,
+                                                           /*bridging*/false);
 
   // Get the callee value.
   auto substFnType = args[0].getType().castTo<SILFunctionType>();

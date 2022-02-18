@@ -3646,12 +3646,13 @@ class GetAsyncContinuationInstBase
 protected:
   CanType ResumeType;
   bool Throws;
+  bool ForBridging;
 
   GetAsyncContinuationInstBase(SILInstructionKind Kind, SILDebugLocation Loc,
                                SILType ContinuationType, CanType ResumeType,
-                               bool Throws)
+                               bool Throws, bool ForBridging)
     : SingleValueInstruction(Kind, Loc, ContinuationType),
-      ResumeType(ResumeType), Throws(Throws) {}
+      ResumeType(ResumeType), Throws(Throws), ForBridging(ForBridging) {}
 
 public:
   /// Get the type of the value the async task receives on a resume.
@@ -3660,6 +3661,10 @@ public:
   
   /// True if the continuation can be used to resume the task by throwing an error.
   bool throws() const { return Throws; }
+
+  /// True if the continuation was created for the purposes of bridging
+  /// an async function that is calling an ObjC completion-handler function.
+  bool bridging() const { return ForBridging; }
   
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_GetAsyncContinuationInstBase &&
@@ -3676,8 +3681,8 @@ class GetAsyncContinuationInst final
   
   GetAsyncContinuationInst(SILDebugLocation Loc,
                            SILType ContinuationType, CanType ResumeType,
-                           bool Throws)
-    : InstructionBase(Loc, ContinuationType, ResumeType, Throws)
+                           bool Throws, bool ForBridging)
+    : InstructionBase(Loc, ContinuationType, ResumeType, Throws, ForBridging)
   {}
   
 public:
@@ -3699,8 +3704,9 @@ class GetAsyncContinuationAddrInst final
   GetAsyncContinuationAddrInst(SILDebugLocation Loc,
                                SILValue ResumeBuf,
                                SILType ContinuationType, CanType ResumeType,
-                               bool Throws)
-    : UnaryInstructionBase(Loc, ResumeBuf, ContinuationType, ResumeType, Throws)
+                               bool Throws, bool ForBridging)
+    : UnaryInstructionBase(Loc, ResumeBuf, ContinuationType, ResumeType, Throws,
+                           ForBridging)
   {}
 };
 

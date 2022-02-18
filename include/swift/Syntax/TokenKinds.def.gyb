@@ -158,6 +158,7 @@ ${token.macro_name()}(${token.unprefixed_kind})
 // in this .def file
 
 SIL_KEYWORD(undef)
+SIL_KEYWORD(bridging)
 SIL_KEYWORD(sil)
 SIL_KEYWORD(sil_stage)
 SIL_KEYWORD(sil_property)

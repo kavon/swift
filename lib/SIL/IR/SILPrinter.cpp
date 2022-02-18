@@ -2333,12 +2333,16 @@ public:
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
+    if (GI->bridging())
+      *this << "[bridging] ";
     *this << GI->getFormalResumeType();
   }
 
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
+    if (GI->bridging())
+      *this << "[bridging] ";
     *this << GI->getFormalResumeType()
           << ", " << getIDAndType(GI->getOperand());
   }

@@ -5865,16 +5865,26 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::GetAsyncContinuationInst:
     case SILInstructionKind::GetAsyncContinuationAddrInst: {
-      // 'get_async_continuation'      '[throws]'? type
-      // 'get_async_continuation_addr' '[throws]'? type ',' operand
-      bool throws = false;
-      if (P.consumeIf(tok::l_square)) {
-        if (P.parseToken(tok::kw_throws, diag::expected_tok_in_sil_instr, "throws")
-            || P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-          return true;
-        
-        throws = true;
-      }
+      // 'get_async_continuation'      '[throws]'? '[bridging]'? type
+      // 'get_async_continuation_addr' '[throws]'? '[bridging]'? type ',' operand
+
+      auto parseOptionalBracket = [&](tok expectedToken,
+                                     StringRef tokenAsString,
+                                     bool &out) -> bool {
+        if (P.consumeIf(tok::l_square)) {
+          if (P.parseToken(expectedToken, diag::expected_tok_in_sil_instr, tokenAsString)
+              || P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+            return true; // error
+
+          out = true; // successfuly parsed it
+        }
+        return false;
+      };
+
+      bool throws = false, bridging = false;
+      if (parseOptionalBracket(tok::kw_throws, "throws", throws) ||
+          parseOptionalBracket(tok::kw_bridging, "bridging", bridging))
+        return true;
       
       CanType resumeTy;
       if (parseASTType(resumeTy)) {
@@ -5894,9 +5904,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       
       if (Opcode == SILInstructionKind::GetAsyncContinuationAddrInst) {
         ResultVal = B.createGetAsyncContinuationAddr(InstLoc, resumeBuffer,
-                                                     resumeTy, throws);
+                                                     resumeTy, throws, bridging);
       } else {
-        ResultVal = B.createGetAsyncContinuation(InstLoc, resumeTy, throws);
+        ResultVal = B.createGetAsyncContinuation(InstLoc, resumeTy, throws, bridging);
       }
       break;
     }

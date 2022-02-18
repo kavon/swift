@@ -59,6 +59,7 @@ uint8_t getNumericValue(tok Value) {
 % end
 
     case tok::kw_undef:
+    case tok::kw_bridging:
     case tok::kw_sil:
     case tok::kw_sil_stage:
     case tok::kw_sil_property:
