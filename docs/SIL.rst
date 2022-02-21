@@ -7287,7 +7287,7 @@ await_async_continuation
 
 ::
 
-  sil-terminator ::= 'await_async_continuation' sil-value
+  sil-terminator ::= 'await_async_continuation' '[bridging]'? sil-value
                         ',' 'resume' sil-identifier
                         (',' 'error' sil-identifier)?
 
@@ -7306,7 +7306,9 @@ IR between ``get_async_continuation[_addr]`` and ``await_async_continuation``.
 This terminator can only appear inside an ``@async`` function. The
 instruction must always have a ``resume`` successor, but must have an
 ``error`` successor if and only if the operand is an
-``UnsafeThrowingContinuation<T>``.
+``UnsafeThrowingContinuation<T>``. The ``[bridging]`` marker must be on either
+both or neither of the ``get_async_continuation[_addr]`` and ``await_async_continuation``
+instructions.
 
 If the operand is the result of a ``get_async_continuation`` instruction,
 then the ``resume`` successor block must take an argument whose type is the

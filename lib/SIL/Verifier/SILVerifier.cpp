@@ -5282,6 +5282,9 @@ public:
     require(cont, "can only await the result of a get_async_continuation instruction");
     bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
 
+    require(cont->bridging() == AACI->bridging(),
+    "bridging status of await_async_continuation must match its operand's");
+
     auto &C = cont->getType().getASTContext();
     
     // The shape of the successors depends on the continuation instruction being
