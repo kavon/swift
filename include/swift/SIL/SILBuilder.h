@@ -2200,11 +2200,13 @@ public:
   AwaitAsyncContinuationInst *createAwaitAsyncContinuation(SILLocation loc,
                                                            SILValue continuation,
                                                            SILBasicBlock *resumeBB,
-                                                           SILBasicBlock *errorBB) {
+                                                           SILBasicBlock *errorBB,
+                                                           bool forBridging) {
     return insertTerminator(
         new (getModule()) AwaitAsyncContinuationInst(getSILDebugLocation(loc),
                                                      continuation,
-                                                     resumeBB, errorBB));
+                                                     resumeBB, errorBB,
+                                                     forBridging));
   }
   
   CondBranchInst *

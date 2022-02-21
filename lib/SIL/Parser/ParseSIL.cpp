@@ -5837,7 +5837,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     }
     case SILInstructionKind::AwaitAsyncContinuationInst: {
-      // 'await_async_continuation' operand, 'resume' bb, 'error' bb
+      // 'await_async_continuation' '[bridging]'? operand, 'resume' bb, 'error' bb
+      bool forBridging = false;
+      if (P.consumeIf(tok::l_square)) {
+        if (P.parseToken(tok::kw_bridging, diag::expected_tok_in_sil_instr, "bridging")
+            || P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+          return true;
+
+        forBridging = true;
+      }
+
       Identifier ResumeBBName, ErrorBBName{};
       SourceLoc ResumeNameLoc, ErrorNameLoc{};
       if (parseTypedValueRef(Val, B)
@@ -5860,7 +5869,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (!ErrorBBName.empty()) {
         errorBB = getBBForReference(ErrorBBName, ErrorNameLoc);
       }
-      ResultVal = B.createAwaitAsyncContinuation(InstLoc, Val, resumeBB, errorBB);
+      ResultVal = B.createAwaitAsyncContinuation(InstLoc, Val, resumeBB,
+                                                 errorBB, forBridging);
       break;
     }
     case SILInstructionKind::GetAsyncContinuationInst:

@@ -8288,12 +8288,15 @@ class AwaitAsyncContinuationInst final
   friend SILBuilder;
   
   std::array<SILSuccessor, 2> Successors;
+  bool ForBridging;
   
   AwaitAsyncContinuationInst(SILDebugLocation Loc, SILValue Continuation,
                              SILBasicBlock *resumeBB,
-                             SILBasicBlock *errorBBOrNull)
+                             SILBasicBlock *errorBBOrNull,
+                             bool ForBridging)
     : UnaryInstructionBase(Loc, Continuation),
-      Successors{{{this}, {this}}}
+      Successors{{{this}, {this}}},
+      ForBridging(ForBridging)
   {
     Successors[0] = resumeBB;
     if (errorBBOrNull)
@@ -8323,6 +8326,10 @@ public:
       return Successors;
     return SuccessorListTy(Successors.data(), 1);
   }
+
+  /// True if the await was created for the purposes of bridging
+  /// an async function that is calling an ObjC completion-handler function.
+  bool bridging() const { return ForBridging; }
 };
 
 /// YieldInst - Yield control temporarily to the caller of this coroutine.

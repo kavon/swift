@@ -1557,7 +1557,8 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   if (throws)
     errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
 
-  SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
+  SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock,
+                                     /*forBridging*/false);
 
   // Propagate an error if we have one.
   if (throws) {

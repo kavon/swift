@@ -3070,7 +3070,8 @@ void SILCloner<ImplClass>
                             getOpBasicBlock(Inst->getResumeBB()),
                             Inst->getErrorBB()
                               ? getOpBasicBlock(Inst->getErrorBB())
-                              : nullptr));
+                              : nullptr,
+                            Inst->bridging()));
 }
 
 template <typename ImplClass>

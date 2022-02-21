@@ -7150,6 +7150,8 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
   Explosion resumeResult;
 
+  assert(!i->bridging() && "TODO: implement await async continuation bridging");
+
   bool isIndirect = i->getResumeBB()->args_empty();
   SILType resumeTy;
   if (!isIndirect)

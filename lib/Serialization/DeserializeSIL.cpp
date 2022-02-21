@@ -2320,12 +2320,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
               getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     
     SILBasicBlock *resultBB = getBBForReference(Fn, ListOfValues[1]);
+    bool forBridging = (bool)ListOfValues[2]; // pull flag out of value list.
     SILBasicBlock *errorBB = nullptr;
-    if (ListOfValues.size() >= 3) {
-      errorBB = getBBForReference(Fn, ListOfValues[2]);
+    if (ListOfValues.size() >= 4) {
+      errorBB = getBBForReference(Fn, ListOfValues[3]);
     }
     
-    ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB, errorBB);
+    ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB,
+                                                      errorBB, forBridging);
     break;
   }
   case SILInstructionKind::SwitchEnumInst:

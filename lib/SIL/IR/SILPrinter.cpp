@@ -2348,6 +2348,9 @@ public:
   }
   
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AI) {
+    if (AI->bridging())
+      *this << "[bridging] ";
+
     *this << getIDAndType(AI->getOperand())
           << ", resume " << Ctx.getID(AI->getResumeBB());
     

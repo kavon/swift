@@ -688,7 +688,8 @@ public:
 
       SGF.B.emitBlock(awaitBB);
     }
-    SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
+    SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock,
+                                       /*forBridging*/ true);
     
     // Propagate an error if we have one.
     if (errorBlock) {

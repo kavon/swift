@@ -456,7 +456,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     
     builder.createAwaitAsyncContinuation(ai->getLoc(),
                                          ai->getOperand(),
-                                         resumeBB, errorBB);
+                                         resumeBB, errorBB,
+                                         ai->bridging());
     ai->eraseFromParent();
     return;
   }

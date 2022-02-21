@@ -1256,10 +1256,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       = cast<AwaitAsyncContinuationInst>(&SI);
 
     // Format: continuation, resume block ID, error block ID if given
-    SmallVector<ValueID, 3> ListOfValues;
+    SmallVector<ValueID, 4> ListOfValues;
     
     ListOfValues.push_back(addValueRef(AACI->getOperand()));
     ListOfValues.push_back(BasicBlockMap[AACI->getResumeBB()]);
+    ListOfValues.push_back((unsigned)AACI->bridging()); // shove a flag here.
     if (auto errorBB = AACI->getErrorBB()) {
       ListOfValues.push_back(BasicBlockMap[errorBB]);
     }
