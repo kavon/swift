@@ -2325,6 +2325,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getASTType()));
     // Always a value, don't need to save category
     ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions()));
+    ListOfValues.push_back((unsigned)IBSHI->bridging()); // include a flag
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),

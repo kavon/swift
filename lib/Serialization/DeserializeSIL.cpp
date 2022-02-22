@@ -2725,8 +2725,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     
     auto SubMap = MF->getSubstitutionMap(ListOfValues[4]);
 
+    bool forBridging = (bool)ListOfValues[5];
+
     ResultInst = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
-                                                      blockTy, SubMap);
+                                                      blockTy, SubMap,
+                                                      forBridging);
     break;
   }
   case SILInstructionKind::UnreachableInst: {

@@ -5576,6 +5576,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       SILType blockType;
       SmallVector<ParsedSubstitution, 4> parsedSubs;
 
+      bool forBridging = false;
+      if (P.consumeIf(tok::l_square)) {
+        if (P.parseToken(tok::kw_bridging, diag::expected_tok_in_sil_instr, "bridging")
+            || P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+          return true;
+
+        forBridging = true;
+      }
+
       if (parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILIdentifier(invoke, invokeLoc, diag::expected_tok_in_sil_instr,
@@ -5614,7 +5623,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
 
       ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                                 blockType, subMap);
+                                                 blockType, subMap,
+                                                 forBridging);
       break;
     }
     case SILInstructionKind::DifferentiableFunctionInst: {

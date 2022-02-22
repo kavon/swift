@@ -585,7 +585,8 @@ public:
     // Initialize the block object for the completion handler.
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
                           impRef, SILType::getPrimitiveObjectType(impFnTy),
-                          SGF.getForwardingSubstitutionMap());
+                          SGF.getForwardingSubstitutionMap(),
+                          /*forBridging*/true);
     
     // Wrap it in optional if the callee expects it.
     if (handlerIsOptional) {

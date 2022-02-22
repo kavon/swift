@@ -2914,7 +2914,8 @@ void SILCloner<ImplClass>::visitInitBlockStorageHeaderInst(
       getBuilder().createInitBlockStorageHeader(
           getOpLocation(Inst->getLoc()), getOpValue(Inst->getBlockStorage()),
           getOpValue(Inst->getInvokeFunction()), getOpType(Inst->getType()),
-          getOpSubstitutionMap(Inst->getSubstitutions())));
+          getOpSubstitutionMap(Inst->getSubstitutions()),
+          Inst->bridging()));
 }
 
 template <typename ImplClass>

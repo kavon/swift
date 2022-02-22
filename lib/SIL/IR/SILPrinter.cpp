@@ -2170,6 +2170,9 @@ public:
     *this << getIDAndType(PBSI->getOperand());
   }
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
+    if (IBSHI->bridging())
+      *this << "[bridging] ";
+
     *this << getIDAndType(IBSHI->getBlockStorage()) << ", invoke "
           << Ctx.getID(IBSHI->getInvokeFunction());
     printSubstitutions(IBSHI->getSubstitutions());

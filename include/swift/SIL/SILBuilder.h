@@ -1895,9 +1895,10 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionMap Subs) {
+                               SubstitutionMap Subs, bool ForBridging) {
     return insert(InitBlockStorageHeaderInst::create(getFunction(),
-      getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
+      getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType,
+                                                     Subs, ForBridging));
   }
 
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {

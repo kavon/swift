@@ -6719,6 +6719,7 @@ void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
 
 void IRGenSILFunction::visitInitBlockStorageHeaderInst(
                                                InitBlockStorageHeaderInst *i) {
+  assert(!i->bridging() && "bridging block header not implemented yet!");
   auto addr = getLoweredAddress(i->getBlockStorage());
   
   // We currently only support static invoke functions.

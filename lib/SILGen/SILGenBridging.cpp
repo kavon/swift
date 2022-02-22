@@ -633,7 +633,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                               SILType::getPrimitiveObjectType(loweredBlockTy),
-                                                   subs);
+                                                   subs, /*forBridging*/false);
 
   // Copy the block so we have an independent heap object we can hand off.
 

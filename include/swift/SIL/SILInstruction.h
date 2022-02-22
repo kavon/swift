@@ -7219,19 +7219,21 @@ class InitBlockStorageHeaderInst
   enum { BlockStorage, InvokeFunction };
   SubstitutionMap Substitutions;
   FixedOperandList<2> Operands;
+  bool ForBridging;
   
   InitBlockStorageHeaderInst(SILDebugLocation DebugLoc, SILValue BlockStorage,
                              SILValue InvokeFunction, SILType BlockType,
-                             SubstitutionMap Subs)
+                             SubstitutionMap Subs, bool ForBridging)
       : InstructionBase(DebugLoc, BlockType),
         Substitutions(Subs),
-        Operands(this, BlockStorage, InvokeFunction) {
+        Operands(this, BlockStorage, InvokeFunction),
+        ForBridging(ForBridging) {
   }
   
   static InitBlockStorageHeaderInst *create(SILFunction &F,
                               SILDebugLocation DebugLoc, SILValue BlockStorage,
                               SILValue InvokeFunction, SILType BlockType,
-                              SubstitutionMap Subs);
+                              SubstitutionMap Subs, bool forBridging);
 public:
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
@@ -7242,6 +7244,10 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  /// True if the block header should indicate that it contains the continuation
+  /// of a Swift async function for the purposes of bridging with ObjC.
+  bool bridging() const { return ForBridging; }
 };
 
 /// StrongRetainInst - Increase the strong reference count of an object.

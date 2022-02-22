@@ -442,14 +442,14 @@ InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionMap Subs) {
+                               SubstitutionMap Subs, bool ForBridging) {
   void *Buffer = F.getModule().allocateInst(
     sizeof(InitBlockStorageHeaderInst),
     alignof(InitBlockStorageHeaderInst));
   
   return ::new (Buffer) InitBlockStorageHeaderInst(DebugLoc, BlockStorage,
                                                    InvokeFunction, BlockType,
-                                                   Subs);
+                                                   Subs, ForBridging);
 }
 
 ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
