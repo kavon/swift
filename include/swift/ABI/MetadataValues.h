@@ -2209,6 +2209,7 @@ public:
     HasExecutorOverride = 1,
     IsPreawaited        = 2,
     IsExecutorSwitchForced = 3,
+    ForBridging         = 4,
   };
 
   explicit AsyncContinuationFlags(size_t bits) : FlagSet(bits) {}
@@ -2216,6 +2217,9 @@ public:
 
   /// Whether the continuation is permitted to throw.
   FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
+
+  /// Whether the continuation is for bridging purposes.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ForBridging, isBridging, setIsBridging)
 
   /// Whether the continuation should be resumed on a different
   /// executor than the current one.  swift_continuation_init

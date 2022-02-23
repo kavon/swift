@@ -154,7 +154,8 @@ public:
   void emitGetAsyncContinuation(SILType resumeTy,
                                 StackAddress optionalResultAddr,
                                 Explosion &out,
-                                bool canThrow);
+                                bool canThrow,
+                                bool forBridging);
 
   void emitAwaitAsyncContinuation(SILType resumeTy,
                                   bool isIndirectResult,

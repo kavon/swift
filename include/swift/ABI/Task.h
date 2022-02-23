@@ -771,6 +771,19 @@ public:
   SwiftError *errorResult;
 };
 
+/// A continuation async-context that provides space for a native async
+/// callee to be invoked, prior to invoking the continuation. This
+/// situation arises when bridging a native async function to an ObjC thunk
+/// for another native async function.
+class BridgingContinuationAsyncContext : public ContinuationAsyncContext {
+public:
+  FutureAsyncContextPrefix bridgedCallee;
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::BridgingContinuation;
+  }
+};
+
 } // end namespace swift
 
 #endif

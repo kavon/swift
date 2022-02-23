@@ -2190,7 +2190,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                             CanSILBlockStorageType blockTy,
                             llvm::Constant *invokeFunction,
                             CanSILFunctionType invokeTy,
-                            ForeignFunctionInfo foreignInfo) {
+                            ForeignFunctionInfo foreignInfo,
+                            bool forBridging) {
   auto &storageTL
     = IGF.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
 
@@ -2221,6 +2222,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   // - HAS_SIGNATURE
   flags |= 1 << 30;
+
+  // FIXME: this is both not fully implemented and possibly not right.
+  // If we go with some sort of standard layout descriptor in the storage,
+  // maybe this would be the right bit?
+  // - BLOCK_HAS_EXTENDED_LAYOUT
+  if (forBridging)
+    flags |= 1 << 31;
   
   auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
   

@@ -756,6 +756,11 @@ public:
   llvm::StructType *AsyncTaskAndContextTy;
   llvm::StructType *ContinuationAsyncContextTy;
   llvm::PointerType *ContinuationAsyncContextPtrTy;
+  llvm::FunctionType *AsyncGenericClosureEntryPointTy;
+  llvm::PointerType  *AsyncGenericClosureEntryPointPtrTy;
+  llvm::StructType *FutureAsyncContextPrefixTy;
+  llvm::StructType  *BridgingContinuationAsyncContextTy;
+  llvm::PointerType *BridgingContinuationAsyncContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;

@@ -6719,7 +6719,6 @@ void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
 
 void IRGenSILFunction::visitInitBlockStorageHeaderInst(
                                                InitBlockStorageHeaderInst *i) {
-  assert(!i->bridging() && "bridging block header not implemented yet!");
   auto addr = getLoweredAddress(i->getBlockStorage());
   
   // We currently only support static invoke functions.
@@ -6741,7 +6740,7 @@ void IRGenSILFunction::visitInitBlockStorageHeaderInst(
   emitBlockHeader(*this, addr,
           i->getBlockStorage()->getType().castTo<SILBlockStorageType>(),
           invokeFn, i->getInvokeFunction()->getType().castTo<SILFunctionType>(),
-          foreignInfo);
+          foreignInfo, i->bridging());
   
   // Cast the storage to the block type to produce the result value.
   llvm::Value *asBlock = Builder.CreateBitCast(addr.getAddress(),
@@ -7130,20 +7129,19 @@ void IRGenModule::emitSILStaticInitializers() {
 
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
-  assert(!i->bridging() && "TODO: implement me");
   Explosion out;
   emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
-                           i->throws());
+                           i->throws(), i->bridging());
   setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
-  assert(!i->bridging() && "TODO: implement me");
+//  assert(!i->bridging() && "TODO: implement me");
   auto resultAddr = getLoweredStackAddress(i->getOperand());
   Explosion out;
   emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
-                           i->throws());
+                           i->throws(), i->bridging());
   setLoweredExplosion(i, out);
 }
 
@@ -7151,7 +7149,7 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
   Explosion resumeResult;
 
-  assert(!i->bridging() && "TODO: implement await async continuation bridging");
+//  assert(!i->bridging() && "TODO: implement await async continuation bridging");
 
   bool isIndirect = i->getResumeBB()->args_empty();
   SILType resumeTy;

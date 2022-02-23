@@ -43,7 +43,8 @@ namespace irgen {
                        CanSILBlockStorageType blockTy,
                        llvm::Constant *invokeFunction,
                        CanSILFunctionType invokeTy,
-                       ForeignFunctionInfo foreignInfo);
+                       ForeignFunctionInfo foreignInfo,
+                       bool forBridging);
 
   /// Emit a partial application thunk for a function pointer applied to a
   /// partial set of argument values.
