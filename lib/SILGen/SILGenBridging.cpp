@@ -1476,9 +1476,34 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   
   Scope scope(*this, loc);
 
+  // Establish thunk's arguments in its entry block.
   for (auto input : objcFnTy->getParameters()) {
     SILType argTy = getSILType(input, objcFnTy);
-    SILValue arg = F.begin()->createFunctionArgument(argTy);
+    F.begin()->createFunctionArgument(argTy);
+  }
+
+  // Determine if the caller passed a block containing a task.
+  Optional<ForeignAsyncConvention> foreignAsync;
+  if (thunk.hasDecl()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(thunk.getDecl())) {
+      foreignAsync = func->getForeignAsyncConvention();
+    }
+  }
+
+  auto &ctx = getASTContext();
+  unsigned handlerIdx = foreignAsync->completionHandlerParamIndex();
+  SILValue block = F.begin()->getArgument(handlerIdx);
+  auto maybeTask = B.createBuiltin(loc, ctx.getIdentifier("extractTaskFromBlock"),
+                      SILType::getRawPointerType(ctx), subs, {block});
+
+  // TODO: check if the task is there and, if so, make one of the types of closures.
+
+  // Copy arguments for the closure.
+  auto params = objcFnTy->getParameters();
+  for (unsigned idx = 0; idx < params.size(); ++idx) {
+    SILParameterInfo input = params[idx];
+    SILValue arg = F.getArgument(idx);
+    SILType argTy = arg->getType();
     // Copy block arguments.
     if (argTy.isBlockPointerCompatible()) {
       auto argCopy = B.createCopyBlock(loc, arg);

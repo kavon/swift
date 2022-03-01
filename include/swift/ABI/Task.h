@@ -777,7 +777,10 @@ public:
 /// for another native async function.
 class BridgingContinuationAsyncContext : public ContinuationAsyncContext {
 public:
-  FutureAsyncContextPrefix bridgedCallee;
+//  FutureAsyncContextPrefix bridgedCallee;
+
+  Flags;  // used to remember that the handshake was successful, which is checked by swift_bridgingcontinuation_resume
+  closure pointer;
 
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::BridgingContinuation;

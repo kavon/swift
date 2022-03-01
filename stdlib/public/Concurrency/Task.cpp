@@ -1288,6 +1288,7 @@ static void swift_task_asyncMainDrainQueueImpl() {
 SWIFT_CC(swift)
 AsyncTask* swift_extract_task_from_block(void* block) {
   printf("Hello from swift_extract_task_from_block\n");
+  assert(false && "implement extract_task_from_block");
   return nullptr;
 }
 

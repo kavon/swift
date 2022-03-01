@@ -691,12 +691,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncGenericClosureEntryPointPtrTy =
     AsyncGenericClosureEntryPointTy->getPointerTo(DefaultAS);
 
-  FutureAsyncContextPrefixTy = createStructType(
-       *this, "swift.future_async_context_prefix",
-       {OpaquePtrTy,                        // indirect result pointer
-        AsyncGenericClosureEntryPointPtrTy, // closure's raw function pointer
-        Int8PtrTy,                          // closure's context
-        ErrorPtrTy});                       // error result pointer
+// TODO: get rid of this; it's overspecified and not truly required for the codegen to know about it.
+//  FutureAsyncContextPrefixTy = createStructType(
+//       *this, "swift.future_async_context_prefix",
+//       {OpaquePtrTy,                        // indirect result pointer
+//        AsyncGenericClosureEntryPointPtrTy, // closure's raw function pointer
+//        Int8PtrTy,                          // closure's context
+//        ErrorPtrTy});                       // error result pointer
 
   BridgingContinuationAsyncContextTy = createStructType(
       *this, "swift.bridging_continuation_context",
@@ -705,7 +706,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
        SwiftExecutorTy,      // resume to executor
-       FutureAsyncContextPrefixTy // context prefix for bridged function
+       // extra space for bridging handshake.
+       Flags,           // 8 bytes
+       Int8PtrTy        // 8 bytes
       });
   BridgingContinuationAsyncContextPtrTy =
     BridgingContinuationAsyncContextTy->getPointerTo(DefaultAS);
