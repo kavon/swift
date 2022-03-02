@@ -573,8 +573,7 @@ static Address emitLoadOfContinuationContext(IRGenFunction &IGF,
 
 static Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
                                                          Address context) {
-  assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy ||
-         context.getType() == IGF.IGM.BridgingContinuationAsyncContextPtrTy);
+  assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
   auto offset = 5 * IGF.IGM.getPointerSize();
   return IGF.Builder.CreateStructGEP(context, 4, offset);
 }
@@ -606,8 +605,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
 
   // Create and setup the continuation context.
   auto continuationContext =
-    createAlloca(forBridging ? IGM.BridgingContinuationAsyncContextTy
-                             : IGM.ContinuationAsyncContextTy,
+    createAlloca(IGM.ContinuationAsyncContextTy,
                  IGM.getAsyncContextAlignment());
   AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
   // TODO: add lifetime with matching lifetime in await_async_continuation

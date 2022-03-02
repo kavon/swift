@@ -681,38 +681,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
-  // This matches the ABI of a closure `<T>() async throws -> T`
-  // using AsyncGenericClosureEntryPoint =
-  //    SWIFT_CC(swiftasync) void (OpaqueValue *,
-  //                               SWIFT_ASYNC_CONTEXT AsyncContext *,
-  //                               SWIFT_CONTEXT void *);
-  AsyncGenericClosureEntryPointTy = llvm::FunctionType::get(
-    VoidTy, {OpaquePtrTy, SwiftContextPtrTy, Int8PtrTy}, /*isVarArg*/false);
-  AsyncGenericClosureEntryPointPtrTy =
-    AsyncGenericClosureEntryPointTy->getPointerTo(DefaultAS);
-
-// TODO: get rid of this; it's overspecified and not truly required for the codegen to know about it.
-//  FutureAsyncContextPrefixTy = createStructType(
-//       *this, "swift.future_async_context_prefix",
-//       {OpaquePtrTy,                        // indirect result pointer
-//        AsyncGenericClosureEntryPointPtrTy, // closure's raw function pointer
-//        Int8PtrTy,                          // closure's context
-//        ErrorPtrTy});                       // error result pointer
-
-  BridgingContinuationAsyncContextTy = createStructType(
-      *this, "swift.bridging_continuation_context",
-      {SwiftContextTy,       // AsyncContext header
-       SizeTy,               // await synchronization
-       ErrorPtrTy,           // error result pointer
-       OpaquePtrTy,          // normal result address
-       SwiftExecutorTy,      // resume to executor
-       // extra space for bridging handshake.
-       Flags,           // 8 bytes
-       Int8PtrTy        // 8 bytes
-      });
-  BridgingContinuationAsyncContextPtrTy =
-    BridgingContinuationAsyncContextTy->getPointerTo(DefaultAS);
-
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }

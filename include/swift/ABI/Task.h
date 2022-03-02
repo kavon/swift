@@ -672,6 +672,7 @@ public:
     enum {
       CanThrow = 0,
       IsExecutorSwitchForced = 1,
+      ForBridging = 2,
     };
 
     explicit FlagsType(size_t bits) : FlagSet(bits) {}
@@ -681,6 +682,11 @@ public:
     FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow,
                                   canThrow,
                                   setCanThrow)
+
+    // Whether this is a bridging continuation.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(ForBridging,
+                                  isBridging,
+                                  setIsBridging)
 
     /// See AsyncContinuationFlags::isExecutorSwitchForced().
     FLAGSET_DEFINE_FLAG_ACCESSORS(IsExecutorSwitchForced,
@@ -775,17 +781,17 @@ public:
 /// callee to be invoked, prior to invoking the continuation. This
 /// situation arises when bridging a native async function to an ObjC thunk
 /// for another native async function.
-class BridgingContinuationAsyncContext : public ContinuationAsyncContext {
-public:
-//  FutureAsyncContextPrefix bridgedCallee;
-
-  Flags;  // used to remember that the handshake was successful, which is checked by swift_bridgingcontinuation_resume
-  closure pointer;
-
-  static bool classof(const AsyncContext *context) {
-    return context->Flags.getKind() == AsyncContextKind::BridgingContinuation;
-  }
-};
+//class BridgingContinuationAsyncContext : public ContinuationAsyncContext {
+//public:
+////  FutureAsyncContextPrefix bridgedCallee;
+//
+//  Flags;  // used to remember that the handshake was successful, which is checked by swift_bridgingcontinuation_resume
+//  closure pointer;
+//
+//  static bool classof(const AsyncContext *context) {
+//    return context->Flags.getKind() == AsyncContextKind::BridgingContinuation;
+//  }
+//};
 
 } // end namespace swift
 

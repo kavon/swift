@@ -1028,6 +1028,7 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                               AsyncContinuationFlags flags) {
   context->Flags = ContinuationAsyncContext::FlagsType();
   if (flags.canThrow()) context->Flags.setCanThrow(true);
+  if (flags.isBridging()) context->Flags.setIsBridging(true);
   if (flags.isExecutorSwitchForced())
     context->Flags.setIsExecutorSwitchForced(true);
   context->ErrorResult = nullptr;
