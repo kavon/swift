@@ -655,15 +655,6 @@ BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 /// Convert a task pointer into a job pointer.
 BUILTIN_MISC_OPERATION(ConvertTaskToJob, "convertTaskToJob", "n", Special)
 
-/// extractTaskFromBlock : (@convention(block) (...) -> Void)
-///                      -> Builtin.NativePointer?
-///
-/// Given an ObjC block, this built-in extracts the task associated with
-/// that continuation, if any. Blocks can have a task associated with them if
-/// formed as a wrapper for the continuation of a Swift async function.
-BUILTIN_MISC_OPERATION(ExtractTaskFromBlock, "extractTaskFromBlock",
-                       "n", Special)
-
 /// ExtractElement has type (Vector<N, T>, Int32) -> T
 BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 

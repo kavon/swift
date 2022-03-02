@@ -1286,12 +1286,5 @@ static void swift_task_asyncMainDrainQueueImpl() {
 #endif
 }
 
-SWIFT_CC(swift)
-AsyncTask* swift_extract_task_from_block(void* block) {
-  printf("Hello from swift_extract_task_from_block\n");
-  assert(false && "implement extract_task_from_block");
-  return nullptr;
-}
-
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

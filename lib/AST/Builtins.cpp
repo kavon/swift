@@ -1495,13 +1495,6 @@ static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
                             _job);
 }
 
-static ValueDecl *getExtractTaskFromBlock(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id,
-                            _thin,
-                            _parameters(_any),
-                            _optional(_nativeObject));
-}
-
 static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                                              Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2850,9 +2843,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
-
-  case BuiltinValueKind::ExtractTaskFromBlock:
-    return getExtractTaskFromBlock(Context, Id);
 
   case BuiltinValueKind::BuildMainActorExecutorRef:
     return getBuildMainActorExecutorRef(Context, Id);

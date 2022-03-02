@@ -340,17 +340,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::ExtractTaskFromBlock) {
-    auto fn = IGF.IGM.getExtractTaskFromBlockFn();
-    auto block = args.claimNext();
-    // FIXME: The argument types are wrong I believe?
-    auto call = IGF.Builder.CreateCall(fn, {block});
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
-    out.add(call);
-    return;
-  }
-
   if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
       Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
     auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor

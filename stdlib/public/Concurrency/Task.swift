@@ -903,18 +903,6 @@ func _getCurrentThreadPriority() -> Int
 
 #if _runtime(_ObjC)
 
-
-// FIXME: I think this built-in needs to be redone.
-@available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
-public func testExtractTask(_ body: __owned @Sendable @escaping () async -> Void) {
-  if let task = Builtin.extractTaskFromBlock(body) {
-    print("extracted the task from body")
-  } else {
-    print("no task found in body")
-  }
-}
-
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.1, *)
