@@ -1495,6 +1495,21 @@ static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
                             _job);
 }
 
+static ValueDecl *getInvokeAsyncFromBridgingThunk(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+
+  // () async throws -> ()
+  auto voidTy = ctx.TheEmptyTupleType;
+  auto extInfo = FunctionType::ExtInfoBuilder()
+                    .withAsync().withThrows().build();
+  auto *fnTy = FunctionType::get({}, voidTy, extInfo);
+
+  builder.addParameter(makeConcrete(fnTy));
+  builder.setResult(voidTy);
+
+  return builder.build(id);
+}
+
 static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                                              Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2843,6 +2858,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
+
+  case BuiltinValueKind::InvokeAsyncFromBridgingThunk:
+    return getInvokeAsyncFromBridgingThunk(Context, Id);
 
   case BuiltinValueKind::BuildMainActorExecutorRef:
     return getBuildMainActorExecutorRef(Context, Id);

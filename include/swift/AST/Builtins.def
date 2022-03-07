@@ -655,6 +655,12 @@ BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 /// Convert a task pointer into a job pointer.
 BUILTIN_MISC_OPERATION(ConvertTaskToJob, "convertTaskToJob", "n", Special)
 
+/// invokeAsyncFromBridgingThunk : (() async throws -> Void) -> Void
+///
+/// Invokes a Swift native async function asynchronously, from a bridging thunk.
+BUILTIN_MISC_OPERATION(InvokeAsyncFromBridgingThunk,
+                       "invokeAsyncFromBridgingThunk", "", Special)
+
 /// ExtractElement has type (Vector<N, T>, Int32) -> T
 BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 
