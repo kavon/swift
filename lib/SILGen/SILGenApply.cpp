@@ -1753,8 +1753,7 @@ static void emitRawApply(SILGenFunction &SGF,
                          CanSILFunctionType substFnType,
                          ApplyOptions options,
                          ArrayRef<SILValue> indirectResultAddrs,
-                         SmallVectorImpl<SILValue> &rawResults,
-                         ExecutorBreadcrumb prevExecutor) {
+                         SmallVectorImpl<SILValue> &rawResults) {
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
   // Get the callee value.
   bool isConsumed = substFnType->isCalleeConsumed();
@@ -1830,7 +1829,7 @@ static void emitRawApply(SILGenFunction &SGF,
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
+      SGF.getTryApplyErrorDest(loc, substFnType,
                                substFnType->getErrorResult(),
                                options.contains(ApplyFlags::DoesNotThrow));
 
@@ -3947,7 +3946,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Emit the call.
   SmallVector<SILValue, 4> rawResults;
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-               /*indirect results*/ {}, rawResults, ExecutorBreadcrumb());
+               /*indirect results*/ {}, rawResults);
 
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::makeArrayRef(rawResults);
@@ -4430,6 +4429,28 @@ public:
 #endif
   }
 };
+
+/// Cleanup to emit an executor-hop breadcrumb on all paths as a clean-up.
+class EmitBreadcrumbCleanup : public Cleanup {
+  ExecutorBreadcrumb breadcrumb;
+
+public:
+  EmitBreadcrumbCleanup(ExecutorBreadcrumb &&breadcrumb)
+    : breadcrumb(std::move(breadcrumb)) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    breadcrumb.emit(SGF, l);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EmitBreadcrumbCleanup "
+                 << "State:" << getState()
+                 << "NeedsEmit:" << breadcrumb.needsEmit();
+#endif
+  }
+};
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -4575,7 +4596,7 @@ RValue SILGenFunction::emitApply(
   {
     SmallVector<SILValue, 1> rawDirectResults;
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-                 indirectResultAddrs, rawDirectResults, breadcrumb);
+                 indirectResultAddrs, rawDirectResults);
     assert(rawDirectResults.size() == 1);
     rawDirectResult = rawDirectResults[0];
   }
@@ -4598,7 +4619,9 @@ RValue SILGenFunction::emitApply(
 
   } else {
     // In the ordinary case, we hop back to the current executor
-    breadcrumb.emit(*this, loc);
+    // we push a clean-up within the current argument scope so it is emitted
+    // on both unwind and regular paths after the apply.
+    Cleanups.pushCleanup<EmitBreadcrumbCleanup>(std::move(breadcrumb));
   }
 
   // Pop the argument scope.

@@ -1746,7 +1746,6 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
-                                      ExecutorBreadcrumb prevExecutor,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 

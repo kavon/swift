@@ -36,7 +36,7 @@ actor MyActor {
   // CHECK:      bb1({{.*}}):
   // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
   // CHECK:      bb2({{.*}}):
-  // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
+  // CHECK-NEXT:   hop_to_executor %0 : $MyActor // FIXME: why is the hop not emitted in the throw branch?
   // CHECK:      } // end sil function '$s4test7MyActorC0A13AsyncFunctionyyYaKF'
   func testAsyncFunction() async throws {
     await callee(p)

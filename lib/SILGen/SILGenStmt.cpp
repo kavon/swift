@@ -1542,7 +1542,6 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
-                                     ExecutorBreadcrumb prevExecutor,
                                      SILResultInfo exnResult,
                                      bool suppressErrorPath) {
   assert(exnResult.getConvention() == ResultConvention::Owned);
@@ -1555,8 +1554,6 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
-
-  prevExecutor.emit(*this, loc);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.

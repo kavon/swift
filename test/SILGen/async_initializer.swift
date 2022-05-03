@@ -131,6 +131,7 @@ enum Birb {
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
+// CHECK-NEXT:     end_borrow {{%.*}} : $MainActor
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeCatyyYaF'
 func makeCat() async {
@@ -142,6 +143,7 @@ func makeCat() async {
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Dog.Type) -> Dog
+// CHECK-NEXT:     end_borrow {{%.*}} : $MainActor
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeDogyyYaF'
 func makeDog() async {
@@ -153,6 +155,7 @@ func makeDog() async {
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Birb.Type) -> Birb
+// CHECK-NEXT:     end_borrow {{%.*}} : $MainActor
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers8makeBirbyyYaF'
 func makeBirb() async {
