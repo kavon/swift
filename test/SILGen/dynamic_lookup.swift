@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
