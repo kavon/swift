@@ -2274,7 +2274,7 @@ RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
   assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
 
   // Emit the operand (the base).
-  SILValue Operand = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
+  ManagedValue Operand = SGF.emitRValueAsSingleValue(E->getBase());
 
   // Emit the member reference.
   return SGF.emitDynamicMemberRef(E, Operand, E->getMember(),
@@ -2930,7 +2930,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
       if (isa<VarDecl>(property)) {
         resultRValue =
-            subSGF.emitDynamicMemberRef(loc, baseSubstValue.getValue(), declRef,
+            subSGF.emitDynamicMemberRef(loc, baseSubstValue, declRef,
                                         propertyType, SGFContext());
       } else {
         assert(isa<SubscriptDecl>(property));

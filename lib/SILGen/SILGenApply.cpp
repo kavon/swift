@@ -4148,6 +4148,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
       cast<FunctionType>(calleeTypeInfo.substResultType).getResult();
   }
 
+  assert(callSite.hasValue());
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
       SGF, calleeTypeInfo, callSite->Loc, uncurriedContext);
 
@@ -6255,19 +6256,11 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
   return result;
 }
 
-RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
+RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc,
+                                            ManagedValue operandMV,
                                             ConcreteDeclRef memberRef,
                                             CanType refTy, SGFContext C) {
   assert(refTy->isOptional());
-
-  if (!memberRef.getDecl()->isInstanceMember()) {
-    auto metatype = operand->getType().castTo<MetatypeType>();
-    assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
-    metatype = CanMetatypeType::get(metatype.getInstanceType(),
-                                    MetatypeRepresentation::ObjC);
-    operand = B.createThickToObjCMetatype(
-        loc, operand, SILType::getPrimitiveObjectType(metatype));
-  }
 
   // Create the continuation block.
   SILBasicBlock *contBB = createBasicBlock();
@@ -6280,18 +6273,32 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
 
   const TypeLowering &optTL = getTypeLowering(refTy);
   auto loweredOptTy = optTL.getLoweredType();
-
   SILValue optTemp = emitTemporaryAllocation(loc, loweredOptTy);
 
-  // Create the branch.
+  // Prepare for the has-member case
+  auto memberDecl = memberRef.getDecl();
+
   FuncDecl *memberFunc;
-  if (auto *VD = dyn_cast<VarDecl>(memberRef.getDecl())) {
+  if (auto *VD = dyn_cast<VarDecl>(memberDecl)) {
     memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
   } else {
-    memberFunc = cast<FuncDecl>(memberRef.getDecl());
+    memberFunc = cast<FuncDecl>(memberDecl);
   }
-  auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func)
-    .asForeign();
+  auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func).asForeign();
+  auto operand = operandMV.getValue();
+
+  // adjust operand
+  if (!memberDecl->isInstanceMember()) {
+    auto metatype = operand->getType().castTo<MetatypeType>();
+    assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
+    metatype = CanMetatypeType::get(metatype.getInstanceType(),
+                                    MetatypeRepresentation::ObjC);
+    operand = B.createThickToObjCMetatype(
+        loc, operand, SILType::getPrimitiveObjectType(metatype));
+    operandMV = ManagedValue::forUnmanaged(operand);
+  }
+
+  // Create the branch to test whether the member exists.
   B.createDynamicMethodBranch(loc, operand, member, hasMemberBB, noMemberBB);
 
   // Create the has-member branch.
@@ -6299,55 +6306,94 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     B.emitBlock(hasMemberBB);
 
     FullExpr hasMemberScope(Cleanups, CleanupLocation(loc));
+    FormalEvaluationScope writebackScope(*this);
+
+    // -------------
+
+    // If the member exists, then we need to wrap that function-value in an
+    // optional. To get the function-value, we partially-apply `self` to the
+    // method.
+
+    CanType protocolSelfType = operand->getType().getASTType();
+    Callee callee = Callee::forWitnessMethod(*this, protocolSelfType, member,
+      memberRef.getSubstitutions(), loc);
+
+    CallEmission emission(*this, std::move(callee), std::move(writebackScope));
+
+    CanType operandTy = operand->getType().getASTType();
+    FunctionType::Param selfArg(operandTy);
+
+//    emission.addSelfParam(loc,
+//      ArgumentSource(loc, RValue(*this, loc, operandTy, operandMV)), selfArg);
+
+    PreparedArguments preparedArgs;
+    preparedArgs.emplace({selfArg});
+//    SmallVector<AnyFunctionType::Param> params;
+//    PreparedArguments preparedArgs(params);
+    preparedArgs.addArbitrary(ArgumentSource(loc, RValue(*this, loc, operandTy, operandMV)));
+
+    emission.addCallSite(CallSite(loc, std::move(preparedArgs)));
+
+    RValue resultRV = emission.apply();
+
+
+//    if ()
+
+
+
+
+
+
+    // -------------
 
     // The argument to the has-member block is the uncurried method.
-    const CanType valueTy = refTy.getOptionalObjectType();
-    CanFunctionType methodTy;
-
-    // For a computed variable, we want the getter.
-    if (isa<VarDecl>(memberRef.getDecl())) {
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
-      CanFunctionType::ExtInfo info;
-      methodTy = CanFunctionType::get({}, valueTy, info);
-    } else {
-      methodTy = cast<FunctionType>(valueTy);
-    }
-
-    // Build a partially-applied foreign formal type.
-    // TODO: instead of building this and then potentially converting, we
-    // should just build a single thunk.
-    auto foreignMethodTy =
-        getPartialApplyOfDynamicMethodFormalType(SGM, member, memberRef);
-
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    CanFunctionType::ExtInfo info;
-    FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg}, methodTy, info);
-
-    auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
-                                                       memberFnTy);
-    SILValue memberArg =
-        hasMemberBB->createPhiArgument(loweredMethodTy, OwnershipKind::Owned);
-
-    // Create the result value.
-    Scope applyScope(Cleanups, CleanupLocation(loc));
-    ManagedValue result = emitDynamicPartialApply(
-        *this, loc, memberArg, operand, foreignMethodTy, methodTy);
-
-    RValue resultRV;
-    if (isa<VarDecl>(memberRef.getDecl())) {
-      resultRV =
-          emitMonomorphicApply(loc, result, {}, foreignMethodTy.getResult(),
-                               valueTy, ApplyOptions(), None, None);
-    } else {
-      resultRV = RValue(*this, loc, valueTy, result);
-    }
+//    const CanType valueTy = refTy.getOptionalObjectType();
+//    CanFunctionType methodTy;
+//
+//    // For a computed variable, we want the getter.
+//    if (isa<VarDecl>(memberRef.getDecl())) {
+//      // FIXME: Verify ExtInfo state is correct, not working by accident.
+//      CanFunctionType::ExtInfo info;
+//      methodTy = CanFunctionType::get({}, valueTy, info);
+//    } else {
+//      methodTy = cast<FunctionType>(valueTy);
+//    }
+//
+//    // Build a partially-applied foreign formal type.
+//    // TODO: instead of building this and then potentially converting, we
+//    // should just build a single thunk.
+//    auto foreignMethodTy =
+//        getPartialApplyOfDynamicMethodFormalType(SGM, member, memberRef);
+//
+//    // FIXME: Verify ExtInfo state is correct, not working by accident.
+//    CanFunctionType::ExtInfo info;
+//    FunctionType::Param arg(operand->getType().getASTType());
+//    auto memberFnTy = CanFunctionType::get({arg}, methodTy, info);
+//
+//    auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
+//                                                       memberFnTy);
+//    SILValue memberArg =
+//        hasMemberBB->createPhiArgument(loweredMethodTy, OwnershipKind::Owned);
+//
+//    // Create the result value.
+//    Scope applyScope(Cleanups, CleanupLocation(loc));
+//    ManagedValue result = emitDynamicPartialApply(
+//        *this, loc, memberArg, operand, foreignMethodTy, methodTy);
+//
+//    RValue resultRV;
+//    if (isa<VarDecl>(memberRef.getDecl())) {
+//      resultRV =
+//          emitMonomorphicApply(loc, result, {}, foreignMethodTy.getResult(),
+//                               valueTy, ApplyOptions(), None, None);
+//    } else {
+//      resultRV = RValue(*this, loc, valueTy, result);
+//    }
 
     // Package up the result in an optional.
     emitInjectOptionalValueInto(loc, {loc, std::move(resultRV)}, optTemp,
                                 optTL);
 
-    applyScope.pop();
+//    applyScope.pop();
     // Branch to the continuation block.
     B.createBranch(loc, contBB);
   }

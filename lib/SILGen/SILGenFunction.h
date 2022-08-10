@@ -1758,7 +1758,7 @@ public:
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
-  RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,
+  RValue emitDynamicMemberRef(SILLocation loc, ManagedValue operand,
                               ConcreteDeclRef memberRef, CanType refTy,
                               SGFContext C);
 
