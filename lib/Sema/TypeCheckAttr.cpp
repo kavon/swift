@@ -320,6 +320,7 @@ public:
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
   void visitMarkerAttr(MarkerAttr *attr);
+  void visitLayoutAttr(LayoutAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
@@ -6896,6 +6897,47 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
 
     if (value->isProtocolRequirement()) {
       value->diagnose(diag::marker_protocol_requirement, proto->getName());
+      break;
+    }
+  }
+}
+
+void AttributeChecker::visitLayoutAttr(LayoutAttr *attr) {
+  auto proto = dyn_cast<ProtocolDecl>(D);
+  if (!proto)
+    return; // checked elsewhere that it's on a protocol.
+
+  // Require experimental feature flag to declare a layout protocol.
+  if (!proto->getASTContext().LangOpts.hasFeature(Feature::LayoutProtocol)) {
+    diagnoseAndRemoveAttr(attr, diag::layout_protocol_experimental);
+    return;
+  }
+
+  // A layout protocol cannot inherit a non-layout protocol.
+  for (auto inheritedProto : proto->getInheritedProtocols()) {
+    if (!inheritedProto->isLayoutProtocol()) {
+      proto->diagnose(
+          diag::layout_protocol_inherit_nonlayout,
+          proto->getName(), inheritedProto->getName());
+      inheritedProto->diagnose(
+          diag::decl_declared_here, inheritedProto->getName());
+    }
+  }
+
+  if (Type superclass = proto->getSuperclass()) {
+    proto->diagnose(
+        diag::layout_protocol_inherit_class,
+        proto->getName(), superclass);
+  }
+
+  // A layout protocol cannot have any requirements.
+  for (auto member : proto->getAllMembers()) {
+    auto value = dyn_cast<ValueDecl>(member);
+    if (!value)
+      continue;
+
+    if (value->isProtocolRequirement()) {
+      value->diagnose(diag::layout_protocol_requirement, proto->getName());
       break;
     }
   }

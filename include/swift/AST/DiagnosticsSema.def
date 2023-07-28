@@ -7002,6 +7002,20 @@ ERROR(marker_protocol_conditional_conformance,none,
       (Identifier, Type, Identifier))
 
 //------------------------------------------------------------------------------
+// MARK: layout protocol diagnostics
+//------------------------------------------------------------------------------
+ERROR(layout_protocol_experimental,none,
+      "LayoutProtocol is an experimental feature", ())
+ERROR(layout_protocol_requirement, none,
+      "layout protocol %0 cannot have any requirements", (DeclName))
+ERROR(layout_protocol_inherit_nonlayout, none,
+      "layout protocol %0 cannot inherit non-layout protocol %1",
+      (DeclName, DeclName))
+ERROR(layout_protocol_inherit_class, none,
+      "layout protocol %0 cannot inherit class %1",
+      (DeclName, Type))
+
+//------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
 

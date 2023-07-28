@@ -2811,6 +2811,35 @@ static bool usesFeatureMarkerProtocol(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLayoutProtocol(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->isLayoutProtocol())
+      return true;
+  }
+
+  // Check for layout protocols in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasLayoutProto = type.findIf([](Type type) {
+        if (auto protoType = type->getAs<ProtocolType>()) {
+          if (auto protoDecl = protoType->getDecl())
+            if (protoDecl->isLayoutProtocol())
+              return true;
+        }
+
+        return false;
+      });
+
+      if (hasLayoutProto)
+        return true;
+    }
+  }
+
+  // TODO: I guess for inlinable/AEIC functions we'd need to check the body?
+
+  return false;
+}
+
 static bool usesFeatureActors(Decl *decl) {
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->isActor())

@@ -741,6 +741,12 @@ DECL_ATTR_KINDS = [
                   APIBreakingToAdd, APIBreakingToRemove,
                   code=144),
 
+    SimpleDeclAttribute('_layout', 'Layout',
+                        OnProtocol,  UserInaccessible,
+                        ABIBreakingToAdd, ABIBreakingToRemove,
+                        APIBreakingToAdd, APIBreakingToRemove,
+                        code=146),
+
 ]
 
 # Schema for declaration modifiers:

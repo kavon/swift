@@ -4985,9 +4985,15 @@ public:
       EffectKind kind) const;
   bool hasPolymorphicEffect(EffectKind kind) const;
 
-  /// Determine whether this is a "marker" protocol, meaning that is indicates
-  /// semantics but has no corresponding witness table.
+  /// Determine whether this is a "marker" protocol, meaning that it indicates
+  /// semantics but has no corresponding runtime metadata (e.g., witness table).
   bool isMarkerProtocol() const;
+
+  /// Determine whether this is a "layout" protocol, meaning that it indicates
+  /// semantics about its implementation details and has runtime metadata,
+  /// but not a witness table. Whether there is any runtime metadata is the main
+  /// differentiator from a marker protocol.
+  bool isLayoutProtocol() const;
 
 private:
   void computeKnownProtocolKind() const;

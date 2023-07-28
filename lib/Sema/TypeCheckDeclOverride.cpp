@@ -1607,6 +1607,7 @@ namespace  {
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)
+    UNINTERESTING_ATTR(Layout)
 
     UNINTERESTING_ATTR(AtReasync)
     UNINTERESTING_ATTR(Nonisolated)
