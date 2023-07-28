@@ -125,6 +125,9 @@ PROTOCOL(FloatingPoint)
 
 PROTOCOL_(Copyable)
 
+PROTOCOL_(BitwiseCopyable)
+PROTOCOL_(BitwiseMovable)
+
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "Dictionary", false)

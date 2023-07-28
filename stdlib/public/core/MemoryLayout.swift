@@ -289,3 +289,8 @@ extension MemoryLayout {
     return value
   }
 }
+
+
+@_layout public protocol _BitwiseCopyable {}
+
+@_layout public protocol _BitwiseMovable {}

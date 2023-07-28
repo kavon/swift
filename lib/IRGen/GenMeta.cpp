@@ -6225,6 +6225,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     return SpecialProtocol::Error;
     
   // The other known protocols aren't special at runtime.
+  case KnownProtocolKind::BitwiseMovable:
+  case KnownProtocolKind::BitwiseCopyable:  // TODO: are we sure this isn't Special at runtime?
   case KnownProtocolKind::Sequence:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
