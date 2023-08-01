@@ -2019,9 +2019,9 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 }
 
 /// Determine whether there are additional semantic checks for conformance
-/// to the given protocol. This should return true when @unchecked can be
+/// to the given protocol. This will return true when @unchecked can be
 /// used to disable those semantic checks.
-static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
+static bool supportsUncheckedConformance(ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
@@ -2228,7 +2228,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
   // Complain about the use of @unchecked for protocols that don't have
   // additional semantic checks.
-  if (conformance->isUnchecked() && !hasAdditionalSemanticChecks(Proto)) {
+  if (conformance->isUnchecked() && !supportsUncheckedConformance(Proto)) {
     C.Diags.diagnose(
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
