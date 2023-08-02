@@ -899,6 +899,13 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // be different from the nominal type.
     assert(conformingNominal != nominal && "Broken inherited conformance");
 
+    // A layout protocol conformed to by a superclass does NOT imply that its
+    // subclass also conforms to the layout protocol, because subclasses may
+    // have additional stored properties. This means only final classes can
+    // conform to a layout protocol.
+    assert(!protocol->isLayoutProtocol()
+               && "layout protocol conformances cannot be inherited");
+
     // Find the superclass type that matches where the conformance was
     // declared.
     auto *conformingClass = cast<ClassDecl>(conformingNominal);
