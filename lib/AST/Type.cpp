@@ -1192,11 +1192,50 @@ bool TypeBase::isPotentiallyAnyObject() {
 }
 
 bool ExistentialLayout::isErrorExistential() const {
+  if (hasExplicitAnyObject || explicitSuperclass)
+    return false;
+
   auto protocols = getProtocols();
-  return (!hasExplicitAnyObject &&
-          !explicitSuperclass &&
-          protocols.size() == 1 &&
-          protocols[0]->isSpecificProtocol(KnownProtocolKind::Error));
+
+  // Grab an ASTContext so we can see if NoncopyableGenerics is enabled
+  if (protocols.empty())
+    return false;
+  auto &ctx = protocols[0]->getASTContext();
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (protocols.size() != NumInvertibleProtocols + 1)
+      return false;
+
+    // "The Error Existential" is exactly the set of:
+    //
+    //     { Error } U { all of the invertible protocols }
+    //
+    // Thus, `any Error & ~Copyable` is not The Error Existential, it's
+    // just some existential that is constrained by Error.
+    InvertibleProtocolSet seenInvertibles;
+    bool sawError = false;
+    for (auto proto : protocols) {
+      auto kp = proto->getKnownProtocolKind();
+      if (!kp)
+        return false;
+
+      if (*kp == KnownProtocolKind::Error) {
+        sawError = true;
+        continue;
+      }
+
+      auto ip = getInvertibleProtocolKind(*kp);
+      if (!ip)
+        return false;
+
+      seenInvertibles.insert(*ip);
+    }
+    return sawError && seenInvertibles == InvertibleProtocolSet::full();
+
+  } else {
+    return protocols.size() == 1 &&
+        protocols[0]->isSpecificProtocol(KnownProtocolKind::Error);
+  }
 }
 
 bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
