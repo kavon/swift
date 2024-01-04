@@ -385,6 +385,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   protocols.push_back(protoDecl);
 
   // NOTE: all the invertible protocols are usable from ObjC.
+  // Also, it is important that we expand defaults at the end, after collecting
+  // the explicit members.
   expandDefaultProtocols(type->getASTContext(), {}, protocols);
 }
 
@@ -422,6 +424,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
       hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
 
   // NOTE: all the invertible protocols are usable from ObjC.
+  // Also, it is important that we expand defaults at the end, after collecting
+  // the explicit members.
   expandDefaultProtocols(type->getASTContext(), type->getInverses(), protocols);
 }
 

@@ -1858,8 +1858,11 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
-  // Should only be one conformance, for the Error protocol.
-  assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
+  // Should only be one stored conformance, for the Error protocol.
+  // But there are 1+NumInvertibleProtocols conformances in the existential's
+  // layout.
+  assert(conformances.size() == 1+NumInvertibleProtocols);
+  assert(destTI.getStoredProtocols().size() == 1);
   const ProtocolDecl *proto = destTI.getStoredProtocols()[0];
   (void) proto;
   assert(proto == conformances[0].getRequirement());
