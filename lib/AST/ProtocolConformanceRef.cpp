@@ -118,6 +118,21 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
     return ProtocolConformanceRef::forInvalid();
   }
 
+  // If the type has been fully substituted and it's for an invertible protocol,
+  // just do a module lookup. This avoids an infinite substitution issue
+  // by recognizing that these protocols are very simple (rdar://119950540).
+  if (auto kp = proto->getKnownProtocolKind()) {
+    if (!substType->hasTypeParameter() && getInvertibleProtocolKind(*kp)) {
+      auto conf =
+          proto->getModuleContext()->lookupConformance(substType, proto);
+
+      if (conf)
+        return conf;
+
+      return ProtocolConformanceRef::forInvalid();
+    }
+  }
+
   // Check the conformance map.
   // FIXME: Pack element level?
   return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
