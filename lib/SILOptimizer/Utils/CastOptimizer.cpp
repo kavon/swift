@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1448,33 +1449,41 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto &Ctx = Mod.getASTContext();
     auto *SM = Mod.getSwiftModule();
 
-    auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());
-    if (!Proto)
+    SmallVector<ProtocolConformanceRef,
+                NumInvertibleProtocols+1> NewConformances;
+
+    // NOTE: this is an arbitrary limitation I've kept here just to limit where
+    // this optimization kicks-in, until someone verifies whether the below
+    // works for all concrete -> existential casts. I believe it would.
+    if (!dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal()))
       return false;
 
-    // SourceType is a non-existential type with a non-conditional
-    // conformance to a protocol represented by the TargetType.
-    //
-    // TypeChecker::conformsToProtocol checks any conditional conformances. If
-    // they depend on information not known until runtime, the conformance
-    // will not be returned. For instance, if `X: P` where `T == Int` in `func
-    // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
-    // `foo(0)` but not for `foo("string")`. There are many cases where
-    // everything is completely static (`X<Int>() as? P`), in which case a
-    // valid conformance will be returned.
-    auto Conformance = SM->conformsToProtocol(SourceType, Proto);
-    if (Conformance.isInvalid())
-      return false;
+    auto layout = TargetType->getExistentialLayout();
+    for (auto proto : layout.getProtocols()) {
+      // SourceType is a non-existential type with a non-conditional
+      // conformance to a protocol represented by the TargetType.
+      //
+      // TypeChecker::conformsToProtocol checks any conditional conformances. If
+      // they depend on information not known until runtime, the conformance
+      // will not be returned. For instance, if `X: P` where `T == Int` in `func
+      // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
+      // `foo(0)` but not for `foo("string")`. There are many cases where
+      // everything is completely static (`X<Int>() as? P`), in which case a
+      // valid conformance will be returned.
+      auto Conformance = SM->conformsToProtocol(SourceType, proto);
+      if (Conformance.isInvalid())
+        return false;
 
-    SILBuilderWithScope B(Inst);
-    SmallVector<ProtocolConformanceRef, 1> NewConformances;
-    NewConformances.push_back(Conformance);
+      NewConformances.push_back(Conformance);
+    }
+
     ArrayRef<ProtocolConformanceRef> Conformances =
         Ctx.AllocateCopy(NewConformances);
 
     auto ExistentialRepr =
         Dest->getType().getPreferredExistentialRepresentation(SourceType);
 
+    SILBuilderWithScope B(Inst);
     switch (ExistentialRepr) {
     default:
       return false;
