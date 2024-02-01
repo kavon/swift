@@ -729,6 +729,7 @@ ProtocolConformanceRef
 ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
                              bool allowMissing) {
   assert(!type->hasTypeParameter());
+  assert(!type->hasTypeVariable());
 
   auto lookupResult = lookupConformance(type, proto, allowMissing);
   if (lookupResult.isInvalid()) {
