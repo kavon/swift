@@ -3280,40 +3280,64 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     LLVM_DEBUG(llvm::dbgs()
                << "    Inserting destroy on dead def" << *defPair.first);
 
-    if (auto *arg = dyn_cast<SILArgument>(defPair.first)) {
-      auto *insertPt = &*arg->getParent()->begin();
-      insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                     liveness.getRootValue(), defPair.second,
-                                     consumes);
-      insertUndefDebugValue(insertPt);
-    } else {
-      auto *inst = cast<SILInstruction>(defPair.first);
+    // If we have a dead-def that is initable-but-not-consumable, then do not
+    // destroy that def. This is b/c we are in some sort of class
+    // initialization and we are looking at the initial part of the live range
+    // before the initialization has occurred. The model that the checker
+    // expects is that values are always initialized at the def
+    // point.
+    if (markedValue->getCheckKind() ==
+        MarkUnresolvedNonCopyableValueInst::CheckKind::InitableButNotConsumable)
+      continue;
 
-      // If we have a dead def that is our mark must check and that mark must
-      // check was an init but not consumable, then do not destroy that
-      // def. This is b/c we are in some sort of class initialization and we are
-      // looking at the initial part of the live range before the initialization
-      // has occured. This is our way of makinmg this fit the model that the
-      // checker expects (which is that values are always initialized at the def
-      // point).
-      if (markedValue && markedValue->getCheckKind() ==
-                             MarkUnresolvedNonCopyableValueInst::CheckKind::
-                                 InitableButNotConsumable)
-        continue;
+    {
+      /// Look through the marker if that's the "def" instruction.
+      auto node = defPair.first;
+      if (auto *checkInst = dyn_cast<MarkUnresolvedNonCopyableValueInst>(node))
+        node = checkInst->getOperand();
 
-      SILInstruction *insertPt;
-      if (auto tryApply = dyn_cast<TryApplyInst>(inst)) {
-        // The dead def is only valid on the success return path.
-        insertPt = &tryApply->getNormalBB()->front();
-      } else {
-        insertPt = inst->getNextInstruction();
-        assert(insertPt && "instruction is a terminator that wasn't handled?");
+      /// If the SILArgument is an indirect function parameter, that's not a
+      /// definition this function is responsible for destroying, so skip.
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(node)) {
+        switch (fArg->getArgumentConvention()) {
+        case swift::SILArgumentConvention::Indirect_In:
+        case swift::SILArgumentConvention::Indirect_In_Guaranteed:
+        case swift::SILArgumentConvention::Indirect_Inout:
+        case swift::SILArgumentConvention::Indirect_InoutAliasable:
+        case swift::SILArgumentConvention::Indirect_In_CXX:
+        case swift::SILArgumentConvention::Indirect_Out:
+        case swift::SILArgumentConvention::Pack_Inout:
+        case swift::SILArgumentConvention::Pack_Out:
+          LLVM_DEBUG(llvm::dbgs()
+                         << "      Skipping indirect argument dead def"
+                         << *defPair.first);
+          continue;
+        case swift::SILArgumentConvention::Direct_Owned:
+        case swift::SILArgumentConvention::Direct_Unowned:
+        case swift::SILArgumentConvention::Direct_Guaranteed:
+        case swift::SILArgumentConvention::Pack_Guaranteed:
+        case swift::SILArgumentConvention::Pack_Owned:
+          break;
+        }
       }
-      insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                     liveness.getRootValue(), defPair.second,
-                                     consumes);
-      insertUndefDebugValue(insertPt);
     }
+
+    /// Find a place to insert the destroy.
+    SILInstruction *insertPt = nullptr;
+    if (auto *arg = dyn_cast<SILArgument>(defPair.first)) {
+      insertPt = &*arg->getParent()->begin();
+    } else if (auto tryApply = dyn_cast<TryApplyInst>(defPair.first)) {
+      // The dead def is only valid on the success return path.
+      insertPt = &tryApply->getNormalBB()->front();
+    } else {
+      insertPt = cast<SILInstruction>(defPair.first)->getNextInstruction();
+    }
+
+    assert(insertPt && "instruction is a terminator that wasn't handled?");
+    insertDestroyBeforeInstruction(addressUseState, insertPt,
+                                   liveness.getRootValue(), defPair.second,
+                                   consumes);
+    insertUndefDebugValue(insertPt);
   }
 
   consumes.finishRecordingFinalConsumes();
