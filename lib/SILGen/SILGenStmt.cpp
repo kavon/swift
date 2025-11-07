@@ -900,7 +900,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                                    loweredRetTy, loweredResultTy);
       RV = RValue(*this, ret, emitConvertedRValue(ret, conversion));
     } else {
-      RV = emitRValue(ret);
+      RV = emitRValue(ret, SGFContext::AllowImmediatePlusZero);
     }
     
     std::move(RV)

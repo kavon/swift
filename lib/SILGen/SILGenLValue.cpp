@@ -3837,7 +3837,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     // This is a 'let', so we can make guarantees.
     return RValue(*this, loc, formalRValueType,
                   C.isGuaranteedPlusZeroOk()
-                    ? Result : Result.copyUnmanaged(*this, loc));
+                    ? Result : Result.ensurePlusOne(*this, loc));
   }
 
   LValue lv = emitLValueForNonMemberVarDecl(
