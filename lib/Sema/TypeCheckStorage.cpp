@@ -914,6 +914,45 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
         storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
+  // AggressiveBorrowing offers borrowing access where it's "expected" that we
+  // borrow by default, rather than copy. The primary target are synthesized
+  // accessors for explicitly declared stored properties.
+  //
+  // The goal is to not break ABI, so we are avoid changing public storage away
+  // from the legacy of getters returning copies.
+  if (storage->getASTContext().LangOpts.hasFeature(
+          Feature::AggressiveBorrowing)) {
+    do {
+      // If the property is implicit, e.g., the `rawValue` property,
+      // then it may have already had a 'get' accessor synthesized for it that
+      // we can't override here. Skip those.
+      //
+      // FIXME: we could lift this limitation by updating Sema a bit more?
+      if (storage->isImplicit())
+        break;
+
+      // Similarly, if the property already has defined accessors, then skip it.
+      // Earlier, we handle cases where the defined accessors are for read, etc.
+      if (storage->hasParsedAccessors())
+        break;
+
+      // FIXME: If the property is a member of a class, then exclusivity
+      //   violations are more likely when borrowing from it. Should we skip?
+
+      // If compiling without library evolution, offer borrowing.
+      if (!storage->getModuleContext()->isResilient())
+        return usesBorrowed(DiagKind::BorrowedAttr);
+
+      // Otherwise, non-public properties can offer borrowing.
+      auto accessScope =
+          storage->getFormalAccessScope(/*useDC=*/nullptr,
+                                        /*treatUsableFromInlineAsPublic=*/true);
+      if (!accessScope.isPublicOrPackage())
+        return usesBorrowed(DiagKind::BorrowedAttr);
+
+    } while (false);
+  }
+
   return OpaqueReadOwnership::Owned;
 }
 

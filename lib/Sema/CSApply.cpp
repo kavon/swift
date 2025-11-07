@@ -7072,6 +7072,13 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 }
 
 Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
+  /// If aggressive borrowing is enabled, don't emit a LoadExpr.
+  if (DC->getASTContext().LangOpts.hasFeature(Feature::AggressiveBorrowing)) {
+    return TypeChecker::addImplicitBorrowExpr(
+      getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
+      [this](Expr *expr, Type type) { setType(expr, type); });
+  }
+
   return TypeChecker::addImplicitLoadExpr(
       getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
       [this](Expr *expr, Type type) { setType(expr, type); });
