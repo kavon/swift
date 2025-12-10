@@ -109,6 +109,9 @@ public struct UnfoldSequence<Element, State>: Sequence, IteratorProtocol {
   @usableFromInline // generic-performance
   internal var _done = false
 
+  // FIXME: should not be required!
+  public typealias Iterator = Self
+
   @inlinable // generic-performance
   public mutating func next() -> Element? {
     guard !_done else { return nil }

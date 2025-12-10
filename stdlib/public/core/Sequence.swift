@@ -522,6 +522,7 @@ extension Sequence where Iterator == NeverIterator<Element>, Self: ~Copyable & ~
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
+  // FIXME: this appears to have been broken by SuppressedAssociatedTypesWithDefaults
   @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
