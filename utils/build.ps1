@@ -2013,7 +2013,7 @@ function Build-BuildTools([Hashtable] $Platform) {
       LLVM_ENABLE_ASSERTIONS = "NO";
       LLVM_ENABLE_LIBEDIT = "NO";
       LLVM_ENABLE_LIBXML2 = "NO";
-      LLVM_ENABLE_PROJECTS = "clang;clang-tools-extra;lldb";
+      LLVM_ENABLE_PROJECTS = "clang;clang-tools-extra;lldb;mlir";
       LLVM_EXTERNAL_PROJECTS = "swift";
       LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
       SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";

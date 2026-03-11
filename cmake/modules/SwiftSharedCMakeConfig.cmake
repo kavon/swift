@@ -198,6 +198,12 @@ macro(swift_common_standalone_build_config_clang product)
   include_directories(${CLANG_INCLUDE_DIRS})
 endmacro()
 
+macro(swift_common_standalone_build_config_mlir product)
+  find_package(MLIR CONFIG REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+  list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+  include_directories(${MLIR_INCLUDE_DIRS})
+endmacro()
+
 macro(swift_common_standalone_build_config_cmark product)
   set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
     CACHE PATH "Path to CMark source code.")
@@ -235,6 +241,7 @@ macro(swift_common_standalone_build_config product)
   swift_common_standalone_build_config_llvm(${product})
   if(SWIFT_INCLUDE_TOOLS)
     swift_common_standalone_build_config_clang(${product})
+    swift_common_standalone_build_config_mlir(${product})
     swift_common_standalone_build_config_cmark(${product})
   endif()
 
@@ -260,7 +267,13 @@ macro(swift_common_unified_build_config product)
     "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include"
     "${LLVM_BINARY_DIR}/tools/clang/include")
 
+  set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
+  set(MLIR_INCLUDE_DIR ${MLIR_MAIN_SRC_DIR}/include)
+  set(MLIR_GENERATED_INCLUDE_DIR ${LLVM_BINARY_DIR}/tools/mlir/include)
+  set(MLIR_INCLUDE_DIRS "${MLIR_INCLUDE_DIR};${MLIR_GENERATED_INCLUDE_DIR}")
+
   include_directories(${CLANG_INCLUDE_DIRS})
+  include_directories(${MLIR_INCLUDE_DIRS})
 
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
 endmacro()

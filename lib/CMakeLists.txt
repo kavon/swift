@@ -10,7 +10,7 @@
 # executables generated when it is set. CMake's scoping rules enforce that these
 # new dependencies will only be added to targets created under Swift's lib
 # directory.
-list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
+list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets mlir-headers)
 
 # Create a library that depends on all tool headers defined in include/module.modulemap
 #
@@ -52,6 +52,7 @@ add_subdirectory(Index)
 add_subdirectory(IDE)
 add_subdirectory(IDETool)
 add_subdirectory(Immediate)
+add_subdirectory(AIR)
 add_subdirectory(IRGen)
 add_subdirectory(LLVMPasses)
 add_subdirectory(Localization)

@@ -243,7 +243,7 @@ class Builder(object):
         if self.install_prefix:
             cmake_args += ["-DCMAKE_INSTALL_PREFIX:PATH=" + self.install_prefix]
         cmake_args += [
-            "-DLLVM_ENABLE_PROJECTS=clang",
+            "-DLLVM_ENABLE_PROJECTS=clang;mlir",
             "-DLLVM_EXTERNAL_PROJECTS=swift",
             '-DLLVM_EXTERNAL_SWIFT_SOURCE_DIR=' + 
             os.path.join(SWIFT_SOURCE_ROOT, 'swift'),

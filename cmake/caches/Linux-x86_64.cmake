@@ -3,6 +3,7 @@ set(LLVM_ENABLE_PROJECTS
       clang-tools-extra
       lld
       lldb
+      mlir
     CACHE STRING "")
 
 set(LLVM_EXTERNAL_PROJECTS

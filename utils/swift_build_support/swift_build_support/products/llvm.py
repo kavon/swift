@@ -361,7 +361,7 @@ class LLVM(cmake_product.CMakeProduct):
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
                 'STRING', 'armv6 armv6m armv7 armv7m armv7em')
 
-        llvm_enable_projects = ['clang']
+        llvm_enable_projects = ['clang', 'mlir']
         llvm_enable_runtimes = []
 
         if self.args.build_compiler_rt and \
