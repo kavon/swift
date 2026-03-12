@@ -1451,6 +1451,8 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
   HelpText<"Emit serialized AST + raw SIL file(s)">, ModeOpt;
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt;
+def emit_air : Flag<["-"], "emit-air">,
+  HelpText<"Emit AIR file(s)">, ModeOpt;
 def emit_pcm : Flag<["-"], "emit-pcm">,
   HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt;
 

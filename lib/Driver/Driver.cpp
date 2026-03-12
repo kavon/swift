@@ -1167,6 +1167,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_SIL;
       break;
 
+    case options::OPT_emit_air:
+      OI.CompilerOutputType = file_types::TY_AIR;
+      break;
+
     case options::OPT_emit_silgen:
       OI.CompilerOutputType = file_types::TY_RawSIL;
       break;
@@ -1714,6 +1718,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         continue;
       case file_types::TY_RawSIB:
       case file_types::TY_RawSIL:
+      case file_types::TY_AIR:
       case file_types::TY_Nothing:
       case file_types::TY_IndexUnitOutputPath:
       case file_types::TY_INVALID:

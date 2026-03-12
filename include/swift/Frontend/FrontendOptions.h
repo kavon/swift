@@ -190,6 +190,8 @@ public:
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
 
+    EmitAIR,    ///< Emit AIR
+
     EmitSILGen, ///< Emit raw SIL
     EmitSIL,    ///< Emit canonical SIL
 

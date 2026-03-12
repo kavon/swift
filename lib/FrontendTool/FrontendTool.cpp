@@ -741,6 +741,41 @@ static bool performCompileStepsPostSILGen(
     FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs,
     ArrayRef<PrimarySpecificPaths> auxPSPs = {});
 
+struct CompileStepResult {
+  bool hadError = false;
+  bool shouldContinue = true;
+};
+
+static CompileStepResult performCompileStepsPreSILGen(
+    CompilerInstance &Instance,
+    llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+    const PrimarySpecificPaths &PSPs) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  DeclContext *dc = nullptr;
+  if (auto *file = context.dyn_cast<FileUnit *>()) {
+    dc = file;
+  } else {
+    dc = cast<ModuleDecl *>(context);
+  }
+  ModuleDecl *swiftModule = dc->getParentModule();
+
+  CompileStepResult result;
+
+  // We've been told to emit SIL after SILGen, so write it now.
+  if (Action == FrontendOptions::ActionType::EmitAIR) {
+    result.shouldContinue = false;
+    result.hadError =
+        performAirInflation(Instance, swiftModule, PSPs.OutputFilename);
+  }
+
+  // FIXME: we aren't running anything unless -emit-air was requested.
+
+  return result;
+}
+
 bool swift::performCompileStepsPostSema(
     CompilerInstance &Instance, int &ReturnValue, FrontendObserver *observer,
     ArrayRef<const char *> CommandLineArgs) {
@@ -817,6 +852,12 @@ bool swift::performCompileStepsPostSema(
       auxPSPs.push_back(auxPSP);
     }
 
+    auto preSILGen = performCompileStepsPreSILGen(Instance, mod, PSPs);
+    if (preSILGen.hadError)
+      return true;
+    if (!preSILGen.shouldContinue)
+      return false;
+
     SILOptions SILOpts = getSILOptions(PSPs, auxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
     auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
@@ -836,6 +877,12 @@ bool swift::performCompileStepsPostSema(
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+
+      auto preSILGen = performCompileStepsPreSILGen(Instance, PrimaryFile, PSPs);
+      result |= preSILGen.hadError;
+      if (!preSILGen.shouldContinue)
+        continue;
+
       SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
       auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
@@ -856,6 +903,12 @@ bool swift::performCompileStepsPostSema(
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
+
+        auto preSILGen = performCompileStepsPreSILGen(Instance, SASTF, PSPs);
+        result |= preSILGen.hadError;
+        if (!preSILGen.shouldContinue)
+          continue;
+
         SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
         auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
@@ -1380,6 +1433,7 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
                                              CommandLineArgs);
         });
   }
+  case FrontendOptions::ActionType::EmitAIR:
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:

@@ -23,6 +23,7 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftPrintAsClang
     swiftSerialization
     swiftSIL
+    swiftAIR
     swiftSILGen
     swiftSILOptimizer
     swiftThreading)

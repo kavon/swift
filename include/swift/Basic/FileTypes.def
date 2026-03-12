@@ -55,6 +55,7 @@ TYPE("package-swiftinterface", PackageSwiftModuleInterfaceFile,  "package.swifti
 TYPE("swiftmodulesummary",  SwiftModuleSummaryFile,    "swiftmodulesummary", "")
 TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
+TYPE("air",                 AIR,                       "air",             "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
 TYPE("lowered-sil",         LoweredSIL,                "sil",             "")
 TYPE("raw-sib",             RawSIB,                    "sib",             "")

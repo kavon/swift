@@ -202,6 +202,9 @@ namespace swift {
                                           DeclContext *DC,
                                           bool allowInverses=true);
 
+  bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
+                           std::optional<StringRef> outputFile);
+
   /// Turn the given module into SIL IR.
   ///
   /// The module must contain source files. The optimizer will assume that the

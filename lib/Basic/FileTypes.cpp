@@ -97,6 +97,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_Dependencies:
   case file_types::TY_Assembly:
   case file_types::TY_ASTDump:
+  case file_types::TY_AIR:
   case file_types::TY_RawSIL:
   case file_types::TY_RawLLVM_IR:
   case file_types::TY_LLVM_IR:
@@ -166,6 +167,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_LoweredSIL:
   case file_types::TY_Dependencies:
   case file_types::TY_ASTDump:
+  case file_types::TY_AIR:
   case file_types::TY_RawSIL:
   case file_types::TY_ClangHeader:
   case file_types::TY_AutolinkFile:
@@ -222,6 +224,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
     return true;
+  case file_types::TY_AIR:
   case file_types::TY_Assembly:
   case file_types::TY_RawLLVM_IR:
   case file_types::TY_LLVM_IR:
@@ -284,6 +287,7 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
   case file_types::TY_Swift:
   case file_types::TY_SIL:
   case file_types::TY_LoweredSIL:
+  case file_types::TY_AIR:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
