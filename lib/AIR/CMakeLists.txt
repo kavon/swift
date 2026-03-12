@@ -6,6 +6,7 @@ target_link_libraries(swiftAIR PRIVATE
   swiftAST
   MLIRIR
   MLIRPass
+  MLIRFuncDialect
 )
 
 set_swift_llvm_is_available(swiftAIR)

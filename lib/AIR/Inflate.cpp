@@ -1,18 +1,56 @@
-#include "mlir/IR/MLIRContext.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
+#include "swift/AST/ASTContext.h"
+
+#include "swift/AST/Decl.h"
+#include "swift/AST/FileSystem.h"
+#include "swift/AST/Module.h"
+#include "swift/Frontend/Frontend.h"
 
 using namespace mlir;
 
-void airSmokeTest() {
+namespace swift {
+
+/// \returns true if there was an error diagnostic emitted
+bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
+                         std::optional<StringRef> OutputFile) {
   MLIRContext context;
+  context.loadDialect<func::FuncDialect>();
 
   OpBuilder builder(&context);
-  auto module = ModuleOp::create(builder.getUnknownLoc());
+  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
+  for (StringRef name : {"secret", "not_secret"}) {
+    auto func = func::FuncOp::create(builder.getUnknownLoc(), name,
+                                     builder.getFunctionType({}, {}));
+    func.setPrivate();
+    module->push_back(func);
+  }
+
+  if (OutputFile) {
+    withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,
+                   [&](raw_ostream &out) {
+                     module->print(out);
+                     return false; // failed
+                   });
+  }
+
+  // Cannot enable multi-threading if we're printing.
+  context.disableMultithreading();
 
   PassManager pm(&context);
-  (void)pm.run(module);
 
-  module->erase();
+  // FIXME: output to the actual file.
+  // raw_ostream &out = llvm::errs();
+  // pm.enableIRPrinting([](Pass *, Operation *) { return true; },
+  //                     [](Pass *, Operation *) { return true; }, true, true,
+  //                     true, out, OpPrintingFlags());
+
+  (void)pm.run(*module);
+
+  return false;
+}
+
 }
