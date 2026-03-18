@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftAIR STATIC
   Inflate.cpp
+  AIRGenModule.cpp
 )
 target_link_libraries(swiftAIR PRIVATE
   swiftAST

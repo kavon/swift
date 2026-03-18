@@ -10,6 +10,8 @@
 #include "swift/AST/Module.h"
 #include "swift/Frontend/Frontend.h"
 
+#include "AIRGenModule.h"
+
 using namespace mlir;
 
 namespace swift {
@@ -20,19 +22,13 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
 
-  OpBuilder builder(&context);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(UnknownLoc::get(&context)));
-  for (StringRef name : {"secret", "not_secret"}) {
-    auto func = func::FuncOp::create(builder.getUnknownLoc(), name,
-                                     builder.getFunctionType({}, {}));
-    func.setPrivate();
-    module->push_back(func);
-  }
+  AIRGenModule AGM(context, ModuleOp::create(UnknownLoc::get(&context)));
+  AGM.emitModule(M);
 
   if (OutputFile) {
     withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,
                    [&](raw_ostream &out) {
-                     module->print(out);
+                     AGM.getModule()->print(out);
                      return false; // failed
                    });
   }
@@ -48,7 +44,7 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
   //                     [](Pass *, Operation *) { return true; }, true, true,
   //                     true, out, OpPrintingFlags());
 
-  (void)pm.run(*module);
+  (void)pm.run(AGM.getModule());
 
   return false;
 }
