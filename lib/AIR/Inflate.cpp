@@ -3,6 +3,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
+#include "swift/AIR/AIROps.h"
 #include "swift/AST/ASTContext.h"
 
 #include "swift/AST/Decl.h"
@@ -21,6 +22,7 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
                          std::optional<StringRef> OutputFile) {
   MLIRContext context;
   context.loadDialect<func::FuncDialect>();
+  context.loadDialect<mlir::air::AIRDialect>();
 
   AIRGenModule AGM(context, ModuleOp::create(UnknownLoc::get(&context)));
   AGM.emitModule(M);
