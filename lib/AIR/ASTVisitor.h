@@ -78,6 +78,17 @@ public:
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }
+
+  // Generate fallback visit*Stmt methods that forward to visitStmt.
+  // Subclasses override specific ones (e.g. visitBraceStmt, visitIfStmt)
+  // and the rest fall through to the catchall.
+#define STMT(Id, Parent) \
+  StmtRetTy visit##Id##Stmt(Id##Stmt *S, Args...AA) { \
+    return static_cast<ImplClass*>(this)->visitStmt(S, \
+                                         std::forward<Args>(AA)...); \
+  }
+#define ABSTRACT_STMT(Id, Parent)
+#include "swift/AST/StmtNodes.def"
 };
 
 template <typename ImplClass,

@@ -4,16 +4,171 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "swift/AIR/AIROps.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 
 using namespace swift;
 using namespace mlir;
+using namespace mlir::air;
 
 namespace {
 
+/// Create an ASTNodeAttr wrapping an ASTNode.
+ASTNodeAttr getASTNodeAttr(OpBuilder &builder, swift::ASTNode node) {
+  return ASTNodeAttr::get(builder.getContext(), node.getOpaqueValue());
+}
+
+/// Emits AIR ops for expressions. For now, all expressions are opaque.
+class ExprEmitter : public swift::air::ExprVisitor<ExprEmitter, Value> {
+  AIRGenModule &AGM;
+public:
+  ExprEmitter(AIRGenModule &agm) : AGM(agm) {}
+
+  Value visitExpr(Expr *E) {
+    auto &builder = AGM.getBuilder();
+    auto loc = builder.getUnknownLoc();
+    auto attr = getASTNodeAttr(builder, E);
+    auto resultTy = ASTValueType::get(builder.getContext());
+    return builder.create<EmbeddedExprOp>(loc, resultTy, attr);
+  }
+};
+
+/// Emits AIR ops for statements.
+class StmtEmitter
+    : public swift::air::ASTVisitor<StmtEmitter, /*ExprRetTy=*/Value> {
+  AIRGenModule &AGM;
+  ExprEmitter exprEmitter;
+
+  OpBuilder &getBuilder() { return AGM.getBuilder(); }
+  Location getLoc() { return getBuilder().getUnknownLoc(); }
+
+public:
+  StmtEmitter(AIRGenModule &agm) : AGM(agm), exprEmitter(agm) {}
+
+  /// Emit a BraceStmt as an air.scope containing its elements.
+  void visitBraceStmt(BraceStmt *BS) {
+    auto &builder = getBuilder();
+    auto loc = getLoc();
+
+    auto scopeOp = builder.create<ScopeOp>(loc);
+    auto *body = new Block();
+    scopeOp.getBody().push_back(body);
+    builder.setInsertionPointToEnd(body);
+
+    emitBraceStmtBody(BS);
+
+    // Ensure the block has a terminator.
+    ScopeOp::ensureTerminator(scopeOp.getBody(), builder, loc);
+    builder.setInsertionPointAfter(scopeOp);
+  }
+
+  /// Emit an IfStmt as an air.if with then/else regions.
+  void visitIfStmt(IfStmt *IS) {
+    auto &builder = getBuilder();
+    auto loc = getLoc();
+
+    // Emit the condition. For now, take the first boolean condition element
+    // and emit it as an embedded expression.
+    Value cond;
+    auto condElements = IS->getCond();
+    if (!condElements.empty() &&
+        condElements.front().getKind() ==
+            StmtConditionElement::CK_Boolean) {
+      cond = exprEmitter.visit(condElements.front().getBoolean());
+    } else {
+      // For pattern-binding or availability conditions, emit the whole
+      // condition list as an opaque embedded expression from the first element.
+      auto *firstExpr = condElements.empty()
+                            ? nullptr
+                            : condElements.front().getBoolean();
+      if (firstExpr)
+        cond = exprEmitter.visit(firstExpr);
+      else
+        cond = exprEmitter.visitExpr(nullptr); // placeholder
+    }
+
+    auto ifOp = builder.create<IfOp>(loc, cond);
+
+    // Emit the 'then' region.
+    {
+      auto *thenBlock = new Block();
+      ifOp.getThenRegion().push_back(thenBlock);
+      builder.setInsertionPointToEnd(thenBlock);
+
+      if (auto *thenBody = IS->getThenStmt()) {
+        emitBraceStmtBody(thenBody);
+      }
+      IfOp::ensureTerminator(ifOp.getThenRegion(), builder, loc);
+    }
+
+    // Emit the 'else' region if present.
+    if (auto *elseStmt = IS->getElseStmt()) {
+      auto *elseBlock = new Block();
+      ifOp.getElseRegion().push_back(elseBlock);
+      builder.setInsertionPointToEnd(elseBlock);
+
+      if (auto *elseBrace = dyn_cast<BraceStmt>(elseStmt)) {
+        emitBraceStmtBody(elseBrace);
+      } else {
+        // else-if chain: the else is another IfStmt.
+        this->visit(elseStmt);
+      }
+      IfOp::ensureTerminator(ifOp.getElseRegion(), builder, loc);
+    }
+
+    builder.setInsertionPointAfter(ifOp);
+  }
+
+  /// Emit a ReturnStmt as an embedded_stmt (opaque for now).
+  void visitReturnStmt(ReturnStmt *RS) {
+    emitOpaqueStmt(RS);
+  }
+
+  /// Fallback: emit any unhandled statement as an opaque air.embedded_stmt.
+  void visitStmt(Stmt *S) {
+    emitOpaqueStmt(S);
+  }
+
+  /// Emit an expression, returning its SSA value.
+  Value visitExpr(Expr *E) {
+    return exprEmitter.visit(E);
+  }
+
+  /// Emit a declaration inside a brace stmt body.
+  void visitDecl(Decl *D) {
+    auto &builder = getBuilder();
+    auto loc = getLoc();
+    auto attr = getASTNodeAttr(builder, D);
+    builder.create<EmbeddedStmtOp>(loc, attr);
+  }
+
+private:
+  /// Emit the elements of a BraceStmt directly into the current insertion
+  /// point (without creating a new air.scope).
+  void emitBraceStmtBody(BraceStmt *BS) {
+    for (auto elem : BS->getElements()) {
+      if (auto *expr = elem.dyn_cast<Expr *>()) {
+        exprEmitter.visit(expr);
+      } else if (auto *stmt = elem.dyn_cast<Stmt *>()) {
+        this->visit(stmt);
+      } else if (auto *decl = elem.dyn_cast<Decl *>()) {
+        visitDecl(decl);
+      }
+    }
+  }
+
+  void emitOpaqueStmt(Stmt *S) {
+    auto &builder = getBuilder();
+    auto loc = getLoc();
+    auto attr = getASTNodeAttr(builder, swift::ASTNode(S));
+    builder.create<EmbeddedStmtOp>(loc, attr);
+  }
+};
+
 /// Visitor for top-level declarations.
-class DeclEmitter : public air::ASTVisitor<DeclEmitter> {
+class DeclEmitter : public swift::air::ASTVisitor<DeclEmitter> {
   AIRGenModule &AGM;
 public:
   DeclEmitter(AIRGenModule &agm) : AGM(agm) {}
@@ -26,7 +181,6 @@ public:
 };
 
 } // end anonymous namespace
-
 
 
 void AIRGenModule::emitFunction(FuncDecl *FD) {
@@ -44,7 +198,11 @@ void AIRGenModule::emitFunction(FuncDecl *FD) {
   Block *entryBlock = funcOp.addEntryBlock();
   builder.setInsertionPointToEnd(entryBlock);
 
-  // TODO: visit the function body (FD->getBody()) to emit statements/exprs.
+  // Emit the function body.
+  if (auto *body = FD->getBody()) {
+    StmtEmitter stmtEmitter(*this);
+    stmtEmitter.visitBraceStmt(body);
+  }
 
   // Every block needs a terminator.
   builder.create<func::ReturnOp>(loc);
