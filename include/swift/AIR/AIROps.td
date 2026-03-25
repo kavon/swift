@@ -26,6 +26,10 @@ def AIR_Dialect : Dialect {
   let cppNamespace = "::mlir::air";
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
+
+  let dependentDialects = [
+    "func::FuncDialect"
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -52,48 +56,51 @@ def AIR_ASTNodeAttr : AttrDef<AIR_Dialect, "ASTNode"> {
 // AIR Types
 //===----------------------------------------------------------------------===//
 
-/// Opaque type for results of air.embedded_expr. No parameters.
-def AIR_ASTValueType : TypeDef<AIR_Dialect, "ASTValue"> {
-  let mnemonic = "ast_value";
+def AIR_ASTType : TypeDef<AIR_Dialect, "AST"> {
+  let mnemonic = "ast_type";
+  let summary = "A wrapper for swift::CanType";
+  let parameters = (ins "swift::CanType":$astType);
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // AIR Operations
 //===----------------------------------------------------------------------===//
 
-def AIR_ScopeOp : AIR_Op<"scope", [
-    SingleBlockImplicitTerminator<"mlir::air::YieldOp">]> {
-  let summary = "Lexical scope (BraceStmt)";
+def AIR_BeginScopeOp : AIR_Op<"begin_scope", [
+    SingleBlockImplicitTerminator<"mlir::air::EndScopeOp">]> {
+  let summary = "Begins a lexical scope";
   let regions = (region SizedRegion<1>:$body);
   let assemblyFormat = "$body attr-dict";
 }
 
-def AIR_IfOp : AIR_Op<"if", [
-    SingleBlockImplicitTerminator<"mlir::air::YieldOp">,
-    NoRegionArguments]> {
-  let summary = "Conditional (if/else)";
-  let arguments = (ins AIR_ASTValueType:$condition);
-  let regions = (region SizedRegion<1>:$thenRegion,
-                        MaxSizedRegion<1>:$elseRegion);
-  let hasCustomAssemblyFormat = 1;
-}
-
-def AIR_YieldOp : AIR_Op<"yield", [Pure, Terminator]> {
-  let summary = "Region terminator";
+def AIR_EndScopeOp : AIR_Op<"end_scope", [Pure, Terminator]> {
+  let summary = "Ends a lexical scope";
   let assemblyFormat = "attr-dict";
 }
 
-def AIR_EmbeddedExprOp : AIR_Op<"embedded_expr", [Pure]> {
-  let summary = "Unevaluated Expr* from the Swift AST";
+def AIR_ASTExprOp : AIR_Op<"ast_expr", [Pure]> {
+  let summary = "Unevaluated Expr* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
-  let results = (outs AIR_ASTValueType:$result);
+  let results = (outs AIR_ASTType:$result);
   let assemblyFormat = "$node attr-dict `:` type($result)";
 }
 
-def AIR_EmbeddedStmtOp : AIR_Op<"embedded_stmt", []> {
-  let summary = "Unevaluated Stmt* from the Swift AST";
+def AIR_ASTStmtOp : AIR_Op<"ast_stmt", []> {
+  let summary = "Unevaluated Stmt* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
   let assemblyFormat = "$node attr-dict";
+}
+
+def AIR_IfOp : AIR_Op<"if", [
+    SingleBlockImplicitTerminator<"mlir::air::EndScopeOp">,
+    NoRegionArguments]> {
+  let summary = "Conditional (if/else)";
+  let arguments = (ins AIR_ASTType:$condition);
+  let regions = (region SizedRegion<1>:$thenRegion,
+                        MaxSizedRegion<1>:$elseRegion);
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif // SWIFT_AIR_OPS_TD

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AIR_AIROPS_H
 #define SWIFT_AIR_AIROPS_H
 
+#include "swift/AST/Type.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"

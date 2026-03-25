@@ -1,4 +1,6 @@
+#include "AIR.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -21,10 +23,9 @@ namespace swift {
 bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
                          std::optional<StringRef> OutputFile) {
   MLIRContext context;
-  context.loadDialect<func::FuncDialect>();
-  context.loadDialect<mlir::air::AIRDialect>();
+  context.loadDialect<air::AIRDialect>();
 
-  AIRGenModule AGM(context, ModuleOp::create(UnknownLoc::get(&context)));
+  AIRGenModule AGM(context, ModuleOp::create(AIRLoc(M, &context)));
   AGM.emitModule(M);
 
   if (OutputFile) {

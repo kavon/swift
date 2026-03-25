@@ -12,7 +12,9 @@
 
 #include "swift/AIR/AIROps.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/Type.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -46,13 +48,13 @@ void AIRDialect::initialize() {
 
 void ASTNodeAttr::print(AsmPrinter &p) const {
   auto node = swift::ASTNode::getFromOpaqueValue(getOpaquePointer());
-  p << "<\n";
-  node.dump(p.getStream(), /*Indent=*/2);
-  p << ">";
+  p << "(\n";
+  node.dump(p.getStream(), /*Indent=*/6);
+  p << ")";
 }
 
 Attribute ASTNodeAttr::parse(AsmParser &parser, Type type) {
-  return {}; // not parseable — contains session-local pointers
+  return {}; // not parseable
 }
 
 //===----------------------------------------------------------------------===//
@@ -71,37 +73,7 @@ void IfOp::print(OpAsmPrinter &p) {
 }
 
 ParseResult IfOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand condOperand;
-  Type condType;
-
-  if (parser.parseOperand(condOperand))
-    return failure();
-
-  // Resolve the condition operand as !air.ast_value.
-  condType = ASTValueType::get(parser.getContext());
-  if (parser.resolveOperand(condOperand, condType, result.operands))
-    return failure();
-
-  // Parse the 'then' region.
-  auto *thenRegion = result.addRegion();
-  if (parser.parseRegion(*thenRegion, /*arguments=*/{}, /*argTypes=*/{}))
-    return failure();
-  IfOp::ensureTerminator(*thenRegion, parser.getBuilder(),
-                         result.location);
-
-  // Parse the optional 'else' region.
-  auto *elseRegion = result.addRegion();
-  if (!parser.parseOptionalKeyword("else")) {
-    if (parser.parseRegion(*elseRegion, /*arguments=*/{}, /*argTypes=*/{}))
-      return failure();
-    IfOp::ensureTerminator(*elseRegion, parser.getBuilder(),
-                           result.location);
-  }
-
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  return success();
+  return failure();
 }
 
 //===----------------------------------------------------------------------===//
@@ -113,6 +85,16 @@ ParseResult IfOp::parse(OpAsmParser &parser, OperationState &result) {
 
 #define GET_TYPEDEF_CLASSES
 #include "swift/AIR/AIROpsTypes.cpp.inc"
+
+void ASTType::print(mlir::AsmPrinter &printer) const {
+  getAstType().print(printer.getStream());
+}
+
+mlir::Type ASTType::parse(mlir::AsmParser &parser) {
+  parser.emitError(parser.getCurrentLocation(),
+                   "parsing swift_type is not supported");
+  return {};
+}
 
 #define GET_ATTRDEF_CLASSES
 #include "swift/AIR/AIROpsAttrDefs.cpp.inc"

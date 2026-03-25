@@ -23,15 +23,16 @@ ASTNodeAttr getASTNodeAttr(OpBuilder &builder, swift::ASTNode node) {
 /// Emits AIR ops for expressions. For now, all expressions are opaque.
 class ExprEmitter : public swift::air::ExprVisitor<ExprEmitter, Value> {
   AIRGenModule &AGM;
+  MLIRContext *Ctx;
 public:
-  ExprEmitter(AIRGenModule &agm) : AGM(agm) {}
+  ExprEmitter(AIRGenModule &agm) : AGM(agm), Ctx(&agm.getContext()) {}
 
   Value visitExpr(Expr *E) {
     auto &builder = AGM.getBuilder();
     auto loc = builder.getUnknownLoc();
     auto attr = getASTNodeAttr(builder, E);
-    auto resultTy = ASTValueType::get(builder.getContext());
-    return builder.create<EmbeddedExprOp>(loc, resultTy, attr);
+    auto resultTy = ASTType::get(Ctx, E->getType()->getCanonicalType());
+    return builder.create<ASTExprOp>(loc, resultTy, attr);
   }
 };
 
@@ -47,12 +48,12 @@ class StmtEmitter
 public:
   StmtEmitter(AIRGenModule &agm) : AGM(agm), exprEmitter(agm) {}
 
-  /// Emit a BraceStmt as an air.scope containing its elements.
+  /// A BraceStmt is an air.begin_scope
   void visitBraceStmt(BraceStmt *BS) {
     auto &builder = getBuilder();
     auto loc = getLoc();
 
-    auto scopeOp = builder.create<ScopeOp>(loc);
+    auto scopeOp = builder.create<BeginScopeOp>(loc);
     auto *body = new Block();
     scopeOp.getBody().push_back(body);
     builder.setInsertionPointToEnd(body);
@@ -60,7 +61,7 @@ public:
     emitBraceStmtBody(BS);
 
     // Ensure the block has a terminator.
-    ScopeOp::ensureTerminator(scopeOp.getBody(), builder, loc);
+    BeginScopeOp::ensureTerminator(scopeOp.getBody(), builder, loc);
     builder.setInsertionPointAfter(scopeOp);
   }
 
@@ -141,7 +142,7 @@ public:
     auto &builder = getBuilder();
     auto loc = getLoc();
     auto attr = getASTNodeAttr(builder, D);
-    builder.create<EmbeddedStmtOp>(loc, attr);
+    builder.create<ASTStmtOp>(loc, attr);
   }
 
 private:
@@ -163,7 +164,7 @@ private:
     auto &builder = getBuilder();
     auto loc = getLoc();
     auto attr = getASTNodeAttr(builder, swift::ASTNode(S));
-    builder.create<EmbeddedStmtOp>(loc, attr);
+    builder.create<ASTStmtOp>(loc, attr);
   }
 };
 
@@ -188,7 +189,10 @@ void AIRGenModule::emitFunction(FuncDecl *FD) {
 
   // Build the MLIR function type from the Swift AST type.
   // For now, a placeholder with no args/results:
+  auto canTy = FD->getResultInterfaceType()->getCanonicalType();
+
   auto funcType = builder.getFunctionType({}, {});
+
 
   // Create the function and insert into the module.
   auto funcOp = func::FuncOp::create(loc, FD->getBaseIdentifier().str(), funcType);
