@@ -58,7 +58,7 @@ Attribute ASTNodeAttr::parse(AsmParser &parser, Type type) {
 }
 
 //===----------------------------------------------------------------------===//
-// IfOp custom print/parse
+// IfOp
 //===----------------------------------------------------------------------===//
 
 void IfOp::print(OpAsmPrinter &p) {
@@ -77,6 +77,61 @@ ParseResult IfOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
+// ASTExprOp
+//===----------------------------------------------------------------------===//
+
+static void printASTNode(OpAsmPrinter &p, void *opaquePtr) {
+  auto node = swift::ASTNode::getFromOpaqueValue(opaquePtr);
+
+  // Dump the AST to a string with no base indentation.
+  llvm::SmallString<256> buf;
+  llvm::raw_svector_ostream sstr(buf);
+  node.dump(sstr, /*Indent=*/0);
+
+  llvm::StringRef text(buf);
+  text = text.rtrim('\n');
+
+  p.increaseIndent();
+  p.printNewline();
+  p << " ⊢ ";
+  p.increaseIndent();
+  // Strip the new-lines so we can use printNewline instead, which will
+  // respect the indentation level of the printer.
+  llvm::SmallVector<llvm::StringRef, 16> lines;
+  text.split(lines, '\n', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  for (auto line : lines) {
+    p.getStream() << line;
+    p.printNewline();
+  }
+  p.decreaseIndent();
+  p.decreaseIndent();
+}
+
+
+void ASTExprOp::print(OpAsmPrinter &p) {
+  p << " : ";
+  p.printType(getResult().getType());
+  printASTNode(p, getNodeAttr().getOpaquePointer());
+}
+
+ParseResult ASTExprOp::parse(OpAsmParser &parser, OperationState &result) {
+  return {}; // not parseable
+}
+
+//===----------------------------------------------------------------------===//
+// ASTStmtOp
+//===----------------------------------------------------------------------===//
+
+void ASTStmtOp::print(OpAsmPrinter &p) {
+  printASTNode(p, getNodeAttr().getOpaquePointer());
+}
+
+ParseResult ASTStmtOp::parse(OpAsmParser &parser, OperationState &result) {
+  return {}; // not parseable
+}
+
+
+//===----------------------------------------------------------------------===//
 // TableGen'd op/type/attr definitions
 //===----------------------------------------------------------------------===//
 
@@ -86,13 +141,18 @@ ParseResult IfOp::parse(OpAsmParser &parser, OperationState &result) {
 #define GET_TYPEDEF_CLASSES
 #include "swift/AIR/AIROpsTypes.cpp.inc"
 
-void ASTType::print(mlir::AsmPrinter &printer) const {
-  getAstType().print(printer.getStream());
+//===----------------------------------------------------------------------===//
+// ASTType
+//===----------------------------------------------------------------------===//
+
+void ASTType::print(mlir::AsmPrinter &p) const {
+  p << "<";
+  getAstType().print(p.getStream());
+  p << ">";
 }
 
-mlir::Type ASTType::parse(mlir::AsmParser &parser) {
-  parser.emitError(parser.getCurrentLocation(),
-                   "parsing swift_type is not supported");
+mlir::Type ASTType::parse(mlir::AsmParser &p) {
+  p.emitError(p.getCurrentLocation(), "parsing is not supported");
   return {};
 }
 

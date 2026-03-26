@@ -84,13 +84,13 @@ def AIR_ASTExprOp : AIR_Op<"ast_expr", [Pure]> {
   let summary = "Unevaluated Expr* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
   let results = (outs AIR_ASTType:$result);
-  let assemblyFormat = "$node attr-dict `:` type($result)";
+  let hasCustomAssemblyFormat = 1;
 }
 
 def AIR_ASTStmtOp : AIR_Op<"ast_stmt", []> {
   let summary = "Unevaluated Stmt* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
-  let assemblyFormat = "$node attr-dict";
+  let hasCustomAssemblyFormat = 1;
 }
 
 def AIR_IfOp : AIR_Op<"if", [

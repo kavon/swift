@@ -186,11 +186,13 @@ public:
 
 void AIRGenModule::emitFunction(FuncDecl *FD) {
   auto loc = builder.getUnknownLoc(); // TODO: convert Swift SourceLoc -> mlir::Location
+  auto *ctx = &getContext();
 
   // Build the MLIR function type from the Swift AST type.
   // For now, a placeholder with no args/results:
-  auto canTy = FD->getResultInterfaceType()->getCanonicalType();
+  auto resultTy = FD->getResultInterfaceType()->getCanonicalType();
 
+  // auto funcType = builder.getFunctionType({}, {ASTType::get(ctx, resultTy)});
   auto funcType = builder.getFunctionType({}, {});
 
 
