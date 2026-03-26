@@ -30,10 +30,12 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
 
   if (OutputFile) {
     withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,
-                   [&](raw_ostream &out) {
-                     AGM.getModule()->print(out);
-                     return false; // failed
-                   });
+       [&](raw_ostream &out) {
+         OpPrintingFlags flags;
+         flags.assumeVerified(); // Avoids double-quoted ops.
+         AGM.getModule()->print(out, flags);
+         return false; // failed
+       });
   }
 
   // Cannot enable multi-threading if we're printing.

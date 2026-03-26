@@ -99,10 +99,13 @@ static void printASTNode(OpAsmPrinter &p, void *opaquePtr) {
   // respect the indentation level of the printer.
   llvm::SmallVector<llvm::StringRef, 16> lines;
   text.split(lines, '\n', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
-  for (auto line : lines) {
-    p.getStream() << line;
-    p.printNewline();
+  for (size_t i = 0, e = lines.size(); i < e; ++i) {
+    p.getStream() << lines[i];
+    if (i != e - 1) {
+      p.printNewline();
+    }
   }
+
   p.decreaseIndent();
   p.decreaseIndent();
 }

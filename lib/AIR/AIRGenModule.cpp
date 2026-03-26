@@ -6,6 +6,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "swift/AIR/AIROps.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 
@@ -189,11 +190,14 @@ void AIRGenModule::emitFunction(FuncDecl *FD) {
   auto *ctx = &getContext();
 
   // Build the MLIR function type from the Swift AST type.
-  // For now, a placeholder with no args/results:
-  auto resultTy = FD->getResultInterfaceType()->getCanonicalType();
-
-  // auto funcType = builder.getFunctionType({}, {ASTType::get(ctx, resultTy)});
-  auto funcType = builder.getFunctionType({}, {});
+  SmallVector<mlir::Type> paramTypes;
+  for (ParamDecl *pd : FD->getParameters()->getArray()) {
+    auto ty = ASTType::get(ctx, pd->getInterfaceType()->getCanonicalType());
+    paramTypes.push_back(ty);
+  }
+  auto resultTy =
+    ASTType::get(ctx, FD->getResultInterfaceType()->getCanonicalType());
+  auto funcType = builder.getFunctionType(paramTypes, {resultTy});
 
 
   // Create the function and insert into the module.
