@@ -240,3 +240,88 @@ void AIRGenModule::emitModule(ModuleDecl *M) {
     // }
   }
 }
+
+
+// MARK: DI Expansion
+
+namespace {
+
+ASTNode getAST(ASTNodeAttr attr) {
+    return swift::ASTNode::getFromOpaqueValue(attr.getOpaquePointer());
+}
+
+/// Emits AIR ops for expressions. For now, all expressions are opaque.
+class DIExpansion : public ASTVisitor<DIExpansion> {
+  AIRGenModule &AGM;
+  MLIRContext *Ctx;
+public:
+  DIExpansion(AIRGenModule &agm) : AGM(agm), Ctx(&agm.getContext()) {}
+
+  void visitDecl(Decl *D) {
+    // SKIPPED!
+  }
+
+  void visitExpr(Expr *E) {
+    // SKIPPED!
+  }
+
+  // TODO: This should do lookup and return the DeclareOp it refers to.
+  // That should be the return of this entire visitor: the variables mentioned.
+  void visitDeclRefExpr(DeclRefExpr *DR) {
+
+  }
+
+  void visitVarDecl(VarDecl *VD) {
+    auto &builder = AGM.getBuilder();
+    auto loc = builder.getUnknownLoc();
+    DI_DeclareOp::create(builder, loc);
+
+    if (VD->hasInitialValue()) {
+      DI_InitOp::create(builder, loc);
+    }
+  }
+
+  void visitAssignExpr(AssignExpr *E) {
+    auto &builder = AGM.getBuilder();
+    auto loc = builder.getUnknownLoc();
+
+    DI_InitOp::create(builder, loc);
+  }
+
+  void visitConsumeExpr(ConsumeExpr *E) {
+    auto &builder = AGM.getBuilder();
+    auto loc = builder.getUnknownLoc();
+
+    // TODO: visit the subexpr first, to get back any variables referenced by it
+    // then mark them all consumed.
+
+    DI_ConsumeOp::create(builder, loc);
+  }
+};
+
+}
+
+// TODO: this should live separately as a pass.
+void AIRGenModule::performDIExpansion() {
+  DIExpansion expander(*this);
+
+  module->walk([&](Operation *op) {
+    auto expand = [&](ASTNodeAttr attr) {
+      builder.setInsertionPointAfter(op);
+      auto ast = getAST(attr);
+      if (Decl *decl = dyn_cast<Decl *>(ast)) {
+        expander.visit(decl);
+      } else if (Expr *expr = dyn_cast<Expr *>(ast)) {
+        expander.visit(expr);
+      } else if (Stmt *stmt = dyn_cast<Stmt *>(ast)) {
+        llvm_unreachable("AIRGenModule should have lowered Stmt's earlier!");
+      }
+    };
+
+    if (ASTStmtOp stmt = dyn_cast<ASTStmtOp>(op)) {
+      expand(stmt.getNode());
+    } else if (ASTExprOp expr = dyn_cast<ASTExprOp>(op)) {
+      expand(expr.getNode());
+    }
+  });
+}

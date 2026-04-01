@@ -27,6 +27,7 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
 
   AIRGenModule AGM(context, ModuleOp::create(AIRLoc(M, &context)));
   AGM.emitModule(M);
+  AGM.performDIExpansion();
 
   if (OutputFile) {
     withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,

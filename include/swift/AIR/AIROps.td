@@ -103,4 +103,23 @@ def AIR_IfOp : AIR_Op<"if", [
   let hasCustomAssemblyFormat = 1;
 }
 
+
+// Abstract Variable Use instructions
+
+def AIR_DI_DeclareOp : AIR_Op<"di.declare", [Pure]> {
+  let summary = "Declares an uninitialized Swift value.";
+}
+
+def AIR_DI_InitOp : AIR_Op<"di.init", [Pure]> {
+  let summary = "Denotes a program-point that initializes a Swift value.";
+}
+
+def AIR_DI_UseOp : AIR_Op<"di.use", [Pure]> {
+  let summary = "Denotes a program-point that requires that a Swift value is initialized.";
+}
+
+def AIR_DI_ConsumeOp : AIR_Op<"di.consume", [Pure]> {
+  let summary = "Denotes a program-point that consumes Swift value, leaving it uninitialized.";
+}
+
 #endif // SWIFT_AIR_OPS_TD

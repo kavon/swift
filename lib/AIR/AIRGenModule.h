@@ -27,6 +27,9 @@ public:
   void emitModule(ModuleDecl *M);
   void emitDecl(Decl *D);
   void emitFunction(FuncDecl *FD);
+
+  // TODO: this should live separately as a pass.
+  void performDIExpansion();
 };
 
 #endif // SWIFT_AIRGEN_MODULE_H
