@@ -7,6 +7,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/Pass.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 
@@ -27,9 +28,9 @@ public:
   void emitModule(ModuleDecl *M);
   void emitDecl(Decl *D);
   void emitFunction(FuncDecl *FD);
-
-  // TODO: this should live separately as a pass.
-  void performDIExpansion();
 };
+
+std::unique_ptr<mlir::Pass> createDIExpansionPass();
+void assignSpliceDisplayNames(mlir::ModuleOp module);
 
 #endif // SWIFT_AIRGEN_MODULE_H

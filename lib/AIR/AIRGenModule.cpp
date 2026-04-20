@@ -3,6 +3,7 @@
 #include "ASTVisitor.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "swift/AIR/AIROps.h"
@@ -232,12 +233,13 @@ using VarRefs = SmallVector<mlir::Value, 2>;
 
 class DIExpansion
     : public ASTVisitor<DIExpansion, /*ExprRetTy=*/VarRefs> {
-  AIRGenModule &AGM;
+  OpBuilder &Builder;
   MLIRContext *Ctx;
   llvm::DenseMap<VarDecl *, mlir::Value> VarLocs;
 
 public:
-  DIExpansion(AIRGenModule &agm) : AGM(agm), Ctx(&agm.getContext()) {}
+  DIExpansion(OpBuilder &builder, MLIRContext *ctx)
+      : Builder(builder), Ctx(ctx) {}
 
   void visitDecl(Decl *D) {}
 
@@ -263,46 +265,42 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
-    auto &builder = AGM.getBuilder();
-    auto loc = builder.getUnknownLoc();
+    auto loc = Builder.getUnknownLoc();
     auto varRefTy = VarRefType::get(Ctx);
-    auto nameAttr = builder.getStringAttr(VD->getBaseName().userFacingName());
-    auto declOp = DI_DeclareOp::create(builder, loc, varRefTy, nameAttr);
+    auto nameAttr = Builder.getStringAttr(VD->getBaseName().userFacingName());
+    auto declOp = DI_DeclareOp::create(Builder, loc, varRefTy, nameAttr);
     VarLocs[VD] = declOp.getResult();
 
     if (VD->hasInitialValue()) {
-      DI_InitOp::create(builder, loc, mlir::ValueRange{declOp.getResult()});
+      DI_InitOp::create(Builder, loc, mlir::ValueRange{declOp.getResult()});
     }
   }
 
   VarRefs visitAssignExpr(AssignExpr *E) {
-    auto &builder = AGM.getBuilder();
-    auto loc = builder.getUnknownLoc();
+    auto loc = Builder.getUnknownLoc();
 
     VarRefs srcRefs = visit(E->getSrc());
     if (!srcRefs.empty())
-      DI_ConsumeOp::create(builder, loc, srcRefs);
+      DI_ConsumeOp::create(Builder, loc, srcRefs);
 
     VarRefs destRefs = visit(E->getDest());
     if (!destRefs.empty())
-      DI_InitOp::create(builder, loc, destRefs);
+      DI_InitOp::create(Builder, loc, destRefs);
 
     return destRefs;
   }
 
   VarRefs visitConsumeExpr(ConsumeExpr *E) {
-    auto &builder = AGM.getBuilder();
-    auto loc = builder.getUnknownLoc();
+    auto loc = Builder.getUnknownLoc();
 
     VarRefs refs = visit(E->getSubExpr());
     if (!refs.empty())
-      DI_ConsumeOp::create(builder, loc, refs);
+      DI_ConsumeOp::create(Builder, loc, refs);
     return {};
   }
 
   VarRefs visitApplyExpr(ApplyExpr *E) {
-    auto &builder = AGM.getBuilder();
-    auto loc = builder.getUnknownLoc();
+    auto loc = Builder.getUnknownLoc();
 
     VarRefs allRefs;
     if (auto *args = E->getArgs()) {
@@ -312,7 +310,7 @@ public:
       }
     }
     if (!allRefs.empty())
-      DI_UseOp::create(builder, loc, allRefs);
+      DI_UseOp::create(Builder, loc, allRefs);
     return {};
   }
 };
@@ -344,31 +342,92 @@ public:
   }
 };
 
+/// Walks expression trees to assign display names to AIRSpliceExpr nodes
+/// using the MLIR AsmState for consistent SSA naming.
+class SpliceNameAssigner : public swift::ASTWalker {
+  AsmState &State;
+
+public:
+  SpliceNameAssigner(AsmState &state) : State(state) {}
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (auto *splice = dyn_cast<AIRSpliceExpr>(E)) {
+      auto val = Value::getFromOpaquePointer(splice->getOpaqueAIROp());
+      llvm::SmallString<8> buf;
+      llvm::raw_svector_ostream os(buf);
+      val.printAsOperand(os, State);
+      splice->setDisplayName(buf);
+    }
+    return Action::Continue(E);
+  }
+};
+
+struct DIExpansionPass
+    : public PassWrapper<DIExpansionPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DIExpansionPass)
+
+  StringRef getArgument() const final { return "air-di-expansion"; }
+  StringRef getDescription() const final {
+    return "Expand AST nodes into DI operations and splice variable references";
+  }
+
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+    MLIRContext *ctx = &getContext();
+    OpBuilder builder(ctx);
+
+    DIExpansion expander(builder, ctx);
+    SpliceInserter splicer(expander);
+
+    module->walk([&](Operation *op) {
+      auto expand = [&](ASTNodeAttr attr) {
+        builder.setInsertionPointAfter(op);
+        auto ast = getAST(attr);
+        if (Decl *decl = dyn_cast<Decl *>(ast)) {
+          expander.visit(decl);
+        } else if (Expr *expr = dyn_cast<Expr *>(ast)) {
+          expander.visit(expr);
+          expr->walk(splicer);
+        } else if (Stmt *stmt = dyn_cast<Stmt *>(ast)) {
+          llvm_unreachable("AIRGenModule should have lowered Stmt's earlier!");
+        }
+      };
+
+      if (ASTStmtOp stmt = dyn_cast<ASTStmtOp>(op)) {
+        expand(stmt.getNode());
+      } else if (ASTExprOp expr = dyn_cast<ASTExprOp>(op)) {
+        expand(expr.getNode());
+      }
+    });
+
+    assignSpliceDisplayNames(module);
+  }
+};
+
 } // end anonymous namespace
 
-// TODO: this should live separately as a pass.
-void AIRGenModule::performDIExpansion() {
-  DIExpansion expander(*this);
-  SpliceInserter splicer(expander);
+void assignSpliceDisplayNames(ModuleOp module) {
+  OpPrintingFlags flags;
+  flags.assumeVerified();
+  AsmState asmState(module.getOperation(), flags);
 
   module->walk([&](Operation *op) {
-    auto expand = [&](ASTNodeAttr attr) {
-      builder.setInsertionPointAfter(op);
-      auto ast = getAST(attr);
-      if (Decl *decl = dyn_cast<Decl *>(ast)) {
-        expander.visit(decl);
-      } else if (Expr *expr = dyn_cast<Expr *>(ast)) {
-        expander.visit(expr);
-        expr->walk(splicer);
-      } else if (Stmt *stmt = dyn_cast<Stmt *>(ast)) {
-        llvm_unreachable("AIRGenModule should have lowered Stmt's earlier!");
-      }
-    };
+    ASTNodeAttr attr;
+    if (auto e = dyn_cast<ASTExprOp>(op))
+      attr = e.getNodeAttr();
+    else if (auto s = dyn_cast<ASTStmtOp>(op))
+      attr = s.getNodeAttr();
+    else
+      return;
 
-    if (ASTStmtOp stmt = dyn_cast<ASTStmtOp>(op)) {
-      expand(stmt.getNode());
-    } else if (ASTExprOp expr = dyn_cast<ASTExprOp>(op)) {
-      expand(expr.getNode());
+    auto ast = swift::ASTNode::getFromOpaqueValue(attr.getOpaquePointer());
+    if (Expr *expr = ast.dyn_cast<Expr *>()) {
+      SpliceNameAssigner assigner(asmState);
+      expr->walk(assigner);
     }
   });
+}
+
+std::unique_ptr<mlir::Pass> createDIExpansionPass() {
+  return std::make_unique<DIExpansionPass>();
 }
