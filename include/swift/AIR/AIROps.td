@@ -64,6 +64,11 @@ def AIR_ASTType : TypeDef<AIR_Dialect, "AST"> {
   let hasCustomAssemblyFormat = 1;
 }
 
+def AIR_VarRefType : TypeDef<AIR_Dialect, "VarRef"> {
+  let mnemonic = "var_ref";
+  let summary = "A reference to a declared AIR variable";
+}
+
 //===----------------------------------------------------------------------===//
 // AIR Operations
 //===----------------------------------------------------------------------===//
@@ -108,18 +113,27 @@ def AIR_IfOp : AIR_Op<"if", [
 
 def AIR_DI_DeclareOp : AIR_Op<"di.declare", [Pure]> {
   let summary = "Declares an uninitialized Swift value.";
+  let arguments = (ins StrAttr:$name);
+  let results = (outs AIR_VarRefType:$result);
+  let assemblyFormat = "`(` $name `)` attr-dict";
 }
 
 def AIR_DI_InitOp : AIR_Op<"di.init", [Pure]> {
   let summary = "Denotes a program-point that initializes a Swift value.";
+  let arguments = (ins Variadic<AIR_VarRefType>:$variables);
+  let assemblyFormat = "`(` $variables `)` attr-dict";
 }
 
 def AIR_DI_UseOp : AIR_Op<"di.use", [Pure]> {
   let summary = "Denotes a program-point that requires that a Swift value is initialized.";
+  let arguments = (ins Variadic<AIR_VarRefType>:$variables);
+  let assemblyFormat = "`(` $variables `)` attr-dict";
 }
 
 def AIR_DI_ConsumeOp : AIR_Op<"di.consume", [Pure]> {
   let summary = "Denotes a program-point that consumes Swift value, leaving it uninitialized.";
+  let arguments = (ins Variadic<AIR_VarRefType>:$variables);
+  let assemblyFormat = "`(` $variables `)` attr-dict";
 }
 
 #endif // SWIFT_AIR_OPS_TD

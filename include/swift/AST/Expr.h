@@ -2176,12 +2176,24 @@ public:
 /// Represents an AIR value that corresponds to the given sub-expression.
 class AIRSpliceExpr : public IdentityExpr {
   void* OpaqueAIROp;
+  mutable char DisplayNameBuf[8] = {};
+  mutable uint8_t DisplayNameLen = 0;
 public:
   AIRSpliceExpr(Expr *subExpr, void* OpaqueOp)
     : IdentityExpr(ExprKind::AIRSplice, subExpr, subExpr->getType(),
                    /*isImplicit=*/true),
       OpaqueAIROp(OpaqueOp) {
     assert(OpaqueAIROp);
+  }
+
+  void *getOpaqueAIROp() const { return OpaqueAIROp; }
+
+  StringRef getDisplayName() const {
+    return StringRef(DisplayNameBuf, DisplayNameLen);
+  }
+  void setDisplayName(StringRef name) const {
+    DisplayNameLen = std::min((size_t)sizeof(DisplayNameBuf), name.size());
+    std::memcpy(DisplayNameBuf, name.data(), DisplayNameLen);
   }
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(getSubExpr())

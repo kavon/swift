@@ -820,6 +820,9 @@ namespace {
     /// Print the end of a new node.
     virtual void printFoot() = 0;
 
+    /// Print raw text at the current indentation level (no parens/framing).
+    virtual void printRawText(StringRef text, TerminalColor color) {}
+
     /// Print a field with a short keyword-style value, printing the value by
     /// passing a closure that takes a \c raw_ostream.
     virtual void printFieldRaw(std::function<void(llvm::raw_ostream &)> body,
@@ -899,6 +902,11 @@ namespace {
 
     void printFoot() override {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void printRawText(StringRef text, TerminalColor color) override {
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, color) << text;
     }
 
     void printFieldRaw(std::function<void(llvm::raw_ostream &)> body,
@@ -1115,6 +1123,10 @@ namespace {
     /// printed.
     void printRecArbitrary(std::function<void(Label)> body, Label label) {
       Writer.printRecArbitrary(body, label);
+    }
+
+    void printRawText(StringRef text, TerminalColor color) {
+      Writer.printRawText(text, color);
     }
 
     /// Print a declaration as a child node.
@@ -3811,7 +3823,7 @@ public:
     printFoot();
   }
   void visitAIRSpliceExpr(AIRSpliceExpr *E, Label label) {
-    llvm::report_fatal_error("TODO: print the %x from MLIR / AIR here and do not recurse into the sub-expression");
+    printRawText(E->getDisplayName(), ExprColor);
   }
   void visitTupleExpr(TupleExpr *E, Label label) {
     printCommon(E, "tuple_expr", label);

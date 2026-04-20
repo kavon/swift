@@ -5,6 +5,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "swift/AIR/AIROps.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
@@ -250,60 +251,128 @@ ASTNode getAST(ASTNodeAttr attr) {
     return swift::ASTNode::getFromOpaqueValue(attr.getOpaquePointer());
 }
 
-/// Emits AIR ops for expressions. For now, all expressions are opaque.
-class DIExpansion : public ASTVisitor<DIExpansion> {
+using VarRefs = SmallVector<mlir::Value, 2>;
+
+class DIExpansion
+    : public ASTVisitor<DIExpansion, /*ExprRetTy=*/VarRefs> {
   AIRGenModule &AGM;
   MLIRContext *Ctx;
+  llvm::DenseMap<VarDecl *, mlir::Value> VarLocs;
+
 public:
   DIExpansion(AIRGenModule &agm) : AGM(agm), Ctx(&agm.getContext()) {}
 
-  void visitDecl(Decl *D) {
-    // SKIPPED!
+  void visitDecl(Decl *D) {}
+
+  VarRefs visitExpr(Expr *E) { return {}; }
+
+  VarRefs visitLoadExpr(LoadExpr *E) {
+    return visit(E->getSubExpr());
   }
 
-  void visitExpr(Expr *E) {
-    // SKIPPED!
+  VarRefs visitDeclRefExpr(DeclRefExpr *DR) {
+    if (auto *VD = dyn_cast<VarDecl>(DR->getDecl())) {
+      if (mlir::Value val = lookupVarDecl(VD))
+        return {val};
+    }
+    return {};
   }
 
-  // TODO: This should do lookup and return the DeclareOp it refers to.
-  // That should be the return of this entire visitor: the variables mentioned.
-  void visitDeclRefExpr(DeclRefExpr *DR) {
-
+  mlir::Value lookupVarDecl(VarDecl *VD) {
+    auto it = VarLocs.find(VD);
+    if (it != VarLocs.end())
+      return it->second;
+    return nullptr;
   }
 
   void visitVarDecl(VarDecl *VD) {
     auto &builder = AGM.getBuilder();
     auto loc = builder.getUnknownLoc();
-    DI_DeclareOp::create(builder, loc);
+    auto varRefTy = VarRefType::get(Ctx);
+    auto nameAttr = builder.getStringAttr(VD->getBaseName().userFacingName());
+    auto declOp = DI_DeclareOp::create(builder, loc, varRefTy, nameAttr);
+    VarLocs[VD] = declOp.getResult();
 
     if (VD->hasInitialValue()) {
-      DI_InitOp::create(builder, loc);
+      DI_InitOp::create(builder, loc, mlir::ValueRange{declOp.getResult()});
     }
   }
 
-  void visitAssignExpr(AssignExpr *E) {
+  VarRefs visitAssignExpr(AssignExpr *E) {
     auto &builder = AGM.getBuilder();
     auto loc = builder.getUnknownLoc();
 
-    DI_InitOp::create(builder, loc);
+    VarRefs srcRefs = visit(E->getSrc());
+    if (!srcRefs.empty())
+      DI_ConsumeOp::create(builder, loc, srcRefs);
+
+    VarRefs destRefs = visit(E->getDest());
+    if (!destRefs.empty())
+      DI_InitOp::create(builder, loc, destRefs);
+
+    return destRefs;
   }
 
-  void visitConsumeExpr(ConsumeExpr *E) {
+  VarRefs visitConsumeExpr(ConsumeExpr *E) {
     auto &builder = AGM.getBuilder();
     auto loc = builder.getUnknownLoc();
 
-    // TODO: visit the subexpr first, to get back any variables referenced by it
-    // then mark them all consumed.
+    VarRefs refs = visit(E->getSubExpr());
+    if (!refs.empty())
+      DI_ConsumeOp::create(builder, loc, refs);
+    return {};
+  }
 
-    DI_ConsumeOp::create(builder, loc);
+  VarRefs visitApplyExpr(ApplyExpr *E) {
+    auto &builder = AGM.getBuilder();
+    auto loc = builder.getUnknownLoc();
+
+    VarRefs allRefs;
+    if (auto *args = E->getArgs()) {
+      for (auto arg : *args) {
+        VarRefs argRefs = visit(arg.getExpr());
+        allRefs.append(argRefs.begin(), argRefs.end());
+      }
+    }
+    if (!allRefs.empty())
+      DI_UseOp::create(builder, loc, allRefs);
+    return {};
   }
 };
 
-}
+/// Walks an expression tree and wraps DeclRefExprs that reference
+/// known variables with AIRSpliceExpr nodes.
+class SpliceInserter : public swift::ASTWalker {
+  DIExpansion &Expander;
+
+public:
+  SpliceInserter(DIExpansion &expander) : Expander(expander) {}
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    auto *DR = dyn_cast<DeclRefExpr>(E);
+    if (!DR)
+      return Action::Continue(E);
+
+    auto *VD = dyn_cast<VarDecl>(DR->getDecl());
+    if (!VD)
+      return Action::Continue(E);
+
+    mlir::Value val = Expander.lookupVarDecl(VD);
+    if (!val)
+      return Action::Continue(E);
+
+    auto &ctx = VD->getASTContext();
+    auto *splice = new (ctx) AIRSpliceExpr(DR, val.getAsOpaquePointer());
+    return Action::Continue(splice);
+  }
+};
+
+} // end anonymous namespace
 
 // TODO: this should live separately as a pass.
 void AIRGenModule::performDIExpansion() {
   DIExpansion expander(*this);
+  SpliceInserter splicer(expander);
 
   module->walk([&](Operation *op) {
     auto expand = [&](ASTNodeAttr attr) {
@@ -313,6 +382,7 @@ void AIRGenModule::performDIExpansion() {
         expander.visit(decl);
       } else if (Expr *expr = dyn_cast<Expr *>(ast)) {
         expander.visit(expr);
+        expr->walk(splicer);
       } else if (Stmt *stmt = dyn_cast<Stmt *>(ast)) {
         llvm_unreachable("AIRGenModule should have lowered Stmt's earlier!");
       }

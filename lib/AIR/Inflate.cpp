@@ -1,12 +1,14 @@
 #include "AIR.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
 #include "swift/AIR/AIROps.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileSystem.h"
@@ -16,6 +18,54 @@
 #include "AIRGenModule.h"
 
 using namespace mlir;
+using namespace mlir::air;
+
+namespace {
+
+/// Walks expression trees to assign display names to AIRSpliceExpr nodes
+/// using the MLIR AsmState for consistent SSA naming.
+class SpliceNameAssigner : public swift::ASTWalker {
+  AsmState &State;
+
+public:
+  SpliceNameAssigner(AsmState &state) : State(state) {}
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (auto *splice = dyn_cast<AIRSpliceExpr>(E)) {
+      auto val = Value::getFromOpaquePointer(splice->getOpaqueAIROp());
+      llvm::SmallString<8> buf;
+      llvm::raw_svector_ostream os(buf);
+      val.printAsOperand(os, State);
+      splice->setDisplayName(buf);
+    }
+    return Action::Continue(E);
+  }
+};
+
+/// Before printing, assign MLIR SSA names to all AIRSpliceExpr nodes
+/// so the ASTDumper can render them as %N.
+static void assignSpliceDisplayNames(ModuleOp module,
+                                     const OpPrintingFlags &flags) {
+  AsmState asmState(module.getOperation(), flags);
+
+  module->walk([&](Operation *op) {
+    ASTNodeAttr attr;
+    if (auto e = dyn_cast<ASTExprOp>(op))
+      attr = e.getNodeAttr();
+    else if (auto s = dyn_cast<ASTStmtOp>(op))
+      attr = s.getNodeAttr();
+    else
+      return;
+
+    auto ast = swift::ASTNode::getFromOpaqueValue(attr.getOpaquePointer());
+    if (Expr *expr = ast.dyn_cast<Expr *>()) {
+      SpliceNameAssigner assigner(asmState);
+      expr->walk(assigner);
+    }
+  });
+}
+
+} // end anonymous namespace
 
 namespace swift {
 
@@ -33,9 +83,10 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
     withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,
        [&](raw_ostream &out) {
          OpPrintingFlags flags;
-         flags.assumeVerified(); // Avoids double-quoted ops.
+         flags.assumeVerified();
+         assignSpliceDisplayNames(AGM.getModule(), flags);
          AGM.getModule()->print(out, flags);
-         return false; // failed
+         return false;
        });
   }
 
@@ -43,12 +94,6 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
   context.disableMultithreading();
 
   PassManager pm(&context);
-
-  // FIXME: output to the actual file.
-  // raw_ostream &out = llvm::errs();
-  // pm.enableIRPrinting([](Pass *, Operation *) { return true; },
-  //                     [](Pass *, Operation *) { return true; }, true, true,
-  //                     true, out, OpPrintingFlags());
 
   (void)pm.run(AGM.getModule());
 
