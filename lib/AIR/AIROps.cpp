@@ -13,8 +13,9 @@
 #include "swift/AIR/AIROps.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Type.h"
-#include "mlir/IR/DialectImplementation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -55,25 +56,6 @@ void ASTNodeAttr::print(AsmPrinter &p) const {
 
 Attribute ASTNodeAttr::parse(AsmParser &parser, Type type) {
   return {}; // not parseable
-}
-
-//===----------------------------------------------------------------------===//
-// IfOp
-//===----------------------------------------------------------------------===//
-
-void IfOp::print(OpAsmPrinter &p) {
-  p << " " << getCondition() << " ";
-  p.printRegion(getThenRegion(), /*printEntryBlockArgs=*/false);
-  auto &elseRegion = getElseRegion();
-  if (!elseRegion.empty()) {
-    p << " else ";
-    p.printRegion(elseRegion, /*printEntryBlockArgs=*/false);
-  }
-  p.printOptionalAttrDict((*this)->getAttrs());
-}
-
-ParseResult IfOp::parse(OpAsmParser &parser, OperationState &result) {
-  return failure();
 }
 
 //===----------------------------------------------------------------------===//

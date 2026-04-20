@@ -10,6 +10,9 @@ target_link_libraries(swiftAIR PRIVATE
   MLIRIR
   MLIRPass
   MLIRFuncDialect
+  MLIRSCFDialect
+  MLIRControlFlowDialect
+  MLIRSCFToControlFlow
 )
 
 set_swift_llvm_is_available(swiftAIR)

@@ -2,6 +2,7 @@
 #include "AIRGenModule.h"
 #include "ASTVisitor.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "swift/AIR/AIROps.h"
@@ -50,30 +51,16 @@ class StmtEmitter
 public:
   StmtEmitter(AIRGenModule &agm) : AGM(agm), exprEmitter(agm) {}
 
-  /// A BraceStmt is an air.begin_scope
   void visitBraceStmt(BraceStmt *BS) {
-    auto &builder = getBuilder();
-    auto loc = getLoc();
-
-    auto scopeOp = builder.create<BeginScopeOp>(loc);
-    auto *body = new Block();
-    scopeOp.getBody().push_back(body);
-    builder.setInsertionPointToEnd(body);
-
     emitBraceStmtBody(BS);
-
-    // Ensure the block has a terminator.
-    BeginScopeOp::ensureTerminator(scopeOp.getBody(), builder, loc);
-    builder.setInsertionPointAfter(scopeOp);
   }
 
-  /// Emit an IfStmt as an air.if with then/else regions.
+  /// Emit an IfStmt as scf.if with then/else regions.
   void visitIfStmt(IfStmt *IS) {
     auto &builder = getBuilder();
     auto loc = getLoc();
 
-    // Emit the condition. For now, take the first boolean condition element
-    // and emit it as an embedded expression.
+    // Emit the condition as !air.ast_type<Bool>.
     Value cond;
     auto condElements = IS->getCond();
     if (!condElements.empty() &&
@@ -81,44 +68,34 @@ public:
             StmtConditionElement::CK_Boolean) {
       cond = exprEmitter.visit(condElements.front().getBoolean());
     } else {
-      // For pattern-binding or availability conditions, emit the whole
-      // condition list as an opaque embedded expression from the first element.
       auto *firstExpr = condElements.empty()
                             ? nullptr
                             : condElements.front().getBoolean();
       if (firstExpr)
         cond = exprEmitter.visit(firstExpr);
       else
-        cond = exprEmitter.visitExpr(nullptr); // placeholder
+        cond = exprEmitter.visitExpr(nullptr);
     }
 
-    auto ifOp = builder.create<IfOp>(loc, cond);
+    // Bridge !air.ast_type<Bool> → i1 for scf.if.
+    auto i1Cond = builder.create<UnrealizedConversionCastOp>(
+        loc, builder.getI1Type(), cond).getResult(0);
 
-    // Emit the 'then' region.
-    {
-      auto *thenBlock = new Block();
-      ifOp.getThenRegion().push_back(thenBlock);
-      builder.setInsertionPointToEnd(thenBlock);
+    bool hasElse = (IS->getElseStmt() != nullptr);
+    auto ifOp = builder.create<scf::IfOp>(loc, i1Cond, hasElse);
 
-      if (auto *thenBody = IS->getThenStmt()) {
-        emitBraceStmtBody(thenBody);
-      }
-      IfOp::ensureTerminator(ifOp.getThenRegion(), builder, loc);
-    }
+    // Emit into the 'then' region (block + yield already created by scf.if).
+    builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+    if (auto *thenBody = IS->getThenStmt())
+      emitBraceStmtBody(thenBody);
 
-    // Emit the 'else' region if present.
-    if (auto *elseStmt = IS->getElseStmt()) {
-      auto *elseBlock = new Block();
-      ifOp.getElseRegion().push_back(elseBlock);
-      builder.setInsertionPointToEnd(elseBlock);
-
-      if (auto *elseBrace = dyn_cast<BraceStmt>(elseStmt)) {
+    // Emit into the 'else' region if present.
+    if (hasElse) {
+      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      if (auto *elseBrace = dyn_cast<BraceStmt>(IS->getElseStmt()))
         emitBraceStmtBody(elseBrace);
-      } else {
-        // else-if chain: the else is another IfStmt.
-        this->visit(elseStmt);
-      }
-      IfOp::ensureTerminator(ifOp.getElseRegion(), builder, loc);
+      else
+        this->visit(IS->getElseStmt());
     }
 
     builder.setInsertionPointAfter(ifOp);

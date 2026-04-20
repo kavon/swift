@@ -1,10 +1,13 @@
 #include "AIR.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "swift/AIR/AIROps.h"
 #include "swift/AST/ASTContext.h"
@@ -73,11 +76,18 @@ namespace swift {
 bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
                          std::optional<StringRef> OutputFile) {
   MLIRContext context;
-  context.loadDialect<air::AIRDialect>();
+  context.loadDialect<air::AIRDialect, mlir::scf::SCFDialect,
+                      mlir::cf::ControlFlowDialect>();
 
   AIRGenModule AGM(context, ModuleOp::create(AIRLoc(M, &context)));
   AGM.emitModule(M);
   AGM.performDIExpansion();
+
+  // Lower scf.if → cf.cond_br / cf.br.
+  context.disableMultithreading();
+  PassManager pm(&context);
+  pm.addPass(createSCFToControlFlowPass());
+  (void)pm.run(AGM.getModule());
 
   if (OutputFile) {
     withOutputPath(M->getASTContext().Diags, CI.getOutputBackend(), *OutputFile,
@@ -89,13 +99,6 @@ bool performAirInflation(CompilerInstance &CI, ModuleDecl *M,
          return false;
        });
   }
-
-  // Cannot enable multi-threading if we're printing.
-  context.disableMultithreading();
-
-  PassManager pm(&context);
-
-  (void)pm.run(AGM.getModule());
 
   return false;
 }

@@ -28,7 +28,8 @@ def AIR_Dialect : Dialect {
   let useDefaultAttributePrinterParser = 1;
 
   let dependentDialects = [
-    "func::FuncDialect"
+    "func::FuncDialect",
+    "scf::SCFDialect"
   ];
 }
 
@@ -73,18 +74,6 @@ def AIR_VarRefType : TypeDef<AIR_Dialect, "VarRef"> {
 // AIR Operations
 //===----------------------------------------------------------------------===//
 
-def AIR_BeginScopeOp : AIR_Op<"begin_scope", [
-    SingleBlockImplicitTerminator<"mlir::air::EndScopeOp">]> {
-  let summary = "Begins a lexical scope";
-  let regions = (region SizedRegion<1>:$body);
-  let assemblyFormat = "$body attr-dict";
-}
-
-def AIR_EndScopeOp : AIR_Op<"end_scope", [Pure, Terminator]> {
-  let summary = "Ends a lexical scope";
-  let assemblyFormat = "attr-dict";
-}
-
 def AIR_ASTExprOp : AIR_Op<"ast_expr", [Pure]> {
   let summary = "Unevaluated Expr* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
@@ -95,16 +84,6 @@ def AIR_ASTExprOp : AIR_Op<"ast_expr", [Pure]> {
 def AIR_ASTStmtOp : AIR_Op<"ast_stmt", []> {
   let summary = "Unevaluated Stmt* from the AST";
   let arguments = (ins AIR_ASTNodeAttr:$node);
-  let hasCustomAssemblyFormat = 1;
-}
-
-def AIR_IfOp : AIR_Op<"if", [
-    SingleBlockImplicitTerminator<"mlir::air::EndScopeOp">,
-    NoRegionArguments]> {
-  let summary = "Conditional (if/else)";
-  let arguments = (ins AIR_ASTType:$condition);
-  let regions = (region SizedRegion<1>:$thenRegion,
-                        MaxSizedRegion<1>:$elseRegion);
   let hasCustomAssemblyFormat = 1;
 }
 
