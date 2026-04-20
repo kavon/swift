@@ -5384,6 +5384,12 @@ void PrintAST::visitInOutExpr(InOutExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitAIRSpliceExpr(AIRSpliceExpr *expr) {
+  // These splice expressions are only emitted as anything special
+  // by the ASTDumper; it is transparent when printing to a swiftinterface.
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitParenExpr(ParenExpr *expr) {
   Printer << "(";
   visit(expr->getSubExpr());

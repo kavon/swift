@@ -363,6 +363,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(Consume, getSubExpr);
   PASS_THROUGH_REFERENCE(Copy, getSubExpr);
   PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
+  PASS_THROUGH_REFERENCE(AIRSplice, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -736,6 +737,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::DynamicType:
     return true;
 
+  case ExprKind::AIRSplice:
   case ExprKind::Await:
   case ExprKind::Unsafe:
   case ExprKind::Consume:
@@ -954,6 +956,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::DynamicSubscript:
   case ExprKind::Sequence:
   case ExprKind::Paren:
+  case ExprKind::AIRSplice:
   case ExprKind::Await:
   case ExprKind::Unsafe:
   case ExprKind::Consume:

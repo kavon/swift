@@ -3810,6 +3810,9 @@ public:
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
+  void visitAIRSpliceExpr(AIRSpliceExpr *E, Label label) {
+    llvm::report_fatal_error("TODO: print the %x from MLIR / AIR here and do not recurse into the sub-expression");
+  }
   void visitTupleExpr(TupleExpr *E, Label label) {
     printCommon(E, "tuple_expr", label);
 

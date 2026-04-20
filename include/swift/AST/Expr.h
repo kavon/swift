@@ -2172,6 +2172,24 @@ public:
     return E->getKind() == ExprKind::UnresolvedMemberChainResult;
   }
 };
+
+/// Represents an AIR value that corresponds to the given sub-expression.
+class AIRSpliceExpr : public IdentityExpr {
+  void* OpaqueAIROp;
+public:
+  AIRSpliceExpr(Expr *subExpr, void* OpaqueOp)
+    : IdentityExpr(ExprKind::AIRSplice, subExpr, subExpr->getType(),
+                   /*isImplicit=*/true),
+      OpaqueAIROp(OpaqueOp) {
+    assert(OpaqueAIROp);
+  }
+
+  SWIFT_FORWARD_SOURCE_LOCS_TO(getSubExpr())
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AIRSplice;
+  }
+};
   
 /// AwaitExpr - An 'await' surrounding an expression, marking that the
 /// expression contains code which is a coroutine that may block.
