@@ -89,6 +89,112 @@ static CanType unwrapExistential(CanType e) {
   return e;
 }
 
+/// Determines whether the inheritance edge from a source protocol to
+/// `target` (or to one of its descendants) involves a `@reparented`
+/// extension whose availability is not guaranteed at the deployment target.
+///
+/// Returns true if every inheritance path from one of `startingProtocols`
+/// to `target` must traverse a reparented inheritance edge whose extension
+/// is not always-available. In that case, the cast cannot be statically
+/// proven to succeed at runtime, since older OS versions may pre-date the
+/// `@reparented` extension that introduced the inheritance relationship.
+static bool
+mustTraverseUnavailableReparenting(ArrayRef<ProtocolDecl *> startingProtocols,
+                                   ProtocolDecl *target) {
+  if (startingProtocols.empty())
+    return false;
+
+  llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
+  SmallVector<ProtocolDecl *, 8> stack(startingProtocols.begin(),
+                                       startingProtocols.end());
+  while (!stack.empty()) {
+    ProtocolDecl *P = stack.pop_back_val();
+    if (P == target)
+      return false;
+    if (!visited.insert(P).second)
+      continue;
+
+    // Build the set of bases reached via @reparented edges, mapped to the
+    // extension that declares the relationship.
+    llvm::SmallDenseMap<ProtocolDecl *, ExtensionDecl *, 4> reparentedBases;
+    for (auto const &entry : P->getReparentingProtocols()) {
+      reparentedBases[std::get<ProtocolDecl *>(entry)] =
+          std::get<ExtensionDecl *>(entry);
+    }
+
+    for (auto *parent : P->getInheritedProtocols()) {
+      // If this is a reparented inheritance edge, only follow it when the
+      // extension is always available at the deployment target.
+      auto it = reparentedBases.find(parent);
+      if (it != reparentedBases.end() &&
+          !it->second->isAlwaysAvailableConformanceContext())
+        continue;
+
+      stack.push_back(parent);
+    }
+  }
+
+  // No path from `startingProtocols` reached `target` without going through
+  // an unavailable reparented edge.
+  return true;
+}
+
+/// Collect the protocols that `nominal` directly conforms to (via its own
+/// inheritance clause and its extensions), filtered to only protocol decls.
+static void
+collectDirectlyConformedProtocols(NominalTypeDecl *nominal,
+                                  SmallVectorImpl<ProtocolDecl *> &result) {
+  auto gather = [&](InheritedTypes inheritedTypes) {
+    for (auto i : inheritedTypes.getIndices()) {
+      Type ty = inheritedTypes.getResolvedType(i);
+      if (!ty || ty->hasError())
+        continue;
+      if (auto *protoTy = ty->getAs<ProtocolType>())
+        result.push_back(protoTy->getDecl());
+    }
+  };
+
+  gather(nominal->getInherited());
+  for (auto *ext : nominal->getExtensions())
+    gather(ext->getInherited());
+}
+
+/// Returns true if `source`'s conformance to `target` is provided by a
+/// `@reparented` inheritance whose extension is not always available at the
+/// current deployment target. In that case, an `is`-cast cannot be folded,
+/// since the conformance only exists on OS versions that include the
+/// extension's availability.
+static bool conformanceRequiresUnavailableReparenting(CanType source,
+                                                      ProtocolDecl *target) {
+  // Only `@reparentable` protocols are eligible to be the new base of a
+  // reparenting relationship, so if the target isn't reparentable, no
+  // reparented edge can land at it and the cast isn't subject to a
+  // reparenting-driven availability constraint.
+  if (!target->getAttrs().hasAttribute<ReparentableAttr>())
+    return false;
+
+  // Gather the protocols that `source` is statically known to conform to.
+  // For an archetype, these come from the generic signature requirements;
+  // for a protocol type, the protocol itself is the starting point; for
+  // other nominal types (struct/class/enum), we collect the directly-stated
+  // protocol conformances and let the inheritance walk find `target`.
+  SmallVector<ProtocolDecl *, 4> starting;
+  if (auto archetype = dyn_cast<ArchetypeType>(source)) {
+    auto conformsTo = archetype->getConformsTo();
+    starting.append(conformsTo.begin(), conformsTo.end());
+  } else if (auto *nominal = source.getAnyNominal()) {
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(nominal))
+      starting.push_back(protoDecl);
+    else
+      collectDirectlyConformedProtocols(nominal, starting);
+  }
+
+  if (starting.empty())
+    return false;
+
+  return mustTraverseUnavailableReparenting(starting, target);
+}
+
 /// Try to classify a conversion from non-existential type
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
@@ -117,6 +223,13 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
   // requirements were satisfied.
   if (auto conformance = checkConformance(source, TargetProtocol)) {
     if (!matchesActorIsolation(conformance, function))
+      return DynamicCastFeasibility::MaySucceed;
+
+    // The compile-time conformance may be provided by a `@reparented`
+    // extension whose availability isn't guaranteed at the deployment
+    // target. In that case, older OS versions don't actually have the
+    // inheritance, so we can't fold the cast to success.
+    if (conformanceRequiresUnavailableReparenting(source, TargetProtocol))
       return DynamicCastFeasibility::MaySucceed;
 
     return DynamicCastFeasibility::WillSucceed;
