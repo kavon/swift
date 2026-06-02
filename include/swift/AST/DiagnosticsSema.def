@@ -7623,6 +7623,11 @@ ERROR(class_designated_init_inlinable_resilient,none,
       "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
+ERROR(designated_init_inlinable_resilient_struct,none,
+      "initializer for resilient struct %0 is "
+      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
+      "delegate (with 'self.init') or assign to 'self'", (Type, unsigned))
+
 ERROR(attribute_invalid_on_stored_property,
       none, "'%0' attribute cannot be applied to stored properties", (DeclAttribute))
 

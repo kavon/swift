@@ -2503,6 +2503,51 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
+static void checkStructConstructorBody(StructDecl *structDecl,
+                                       ConstructorDecl *ctor,
+                                       BraceStmt *body) {
+  // A serialized initializer of a resilient struct must delegate via
+  // 'self.init' or assign to 'self'.
+  if (!structDecl->isResilient() ||
+      ctor->getResilienceExpansion() != ResilienceExpansion::Minimal ||
+      ctor->getDelegatingOrChainedInitKind().initExpr != nullptr)
+    return;
+
+  // Look for 'self = ...'; mixed member-wise init and full self-reassigned
+  // bodies fall through to DI.
+  class FindSelfAssign : public ASTWalker {
+  public:
+    const ConstructorDecl *ctor;
+    bool foundSelfAssign = false;
+
+    FindSelfAssign(const ConstructorDecl *ctor) : ctor(ctor) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (isa<ClosureExpr>(E))
+        return Action::SkipNode(E);
+      if (auto *assign = dyn_cast<AssignExpr>(E)) {
+        auto *dest = assign->getDest()->getSemanticsProvidingExpr();
+        if (dest->isSelfExprOf(ctor, /*sameBase*/ true))
+          foundSelfAssign = true;
+      }
+      return Action::Continue(E);
+    }
+  };
+
+  FindSelfAssign finder(ctor);
+  body->walk(finder);
+  if (finder.foundSelfAssign)
+    return;
+
+  ctor->diagnose(diag::designated_init_inlinable_resilient_struct,
+                 structDecl->getDeclaredInterfaceType(),
+                 ctor->getFragileFunctionKind().getSelector());
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const TypeCheckASTNodeAtLocContext &ctx) {
   if (ctx.isForUnattachedNode()) {
@@ -3109,10 +3154,12 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     hadError = SC.typeCheckBody(body);
   }
 
-  // Class constructor checking.
+  // Constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
       checkClassConstructorBody(classDecl, ctor, body);
+    } else if (auto structDecl = ctor->getDeclContext()->getSelfStructDecl()) {
+      checkStructConstructorBody(structDecl, ctor, body);
     }
   }
 
