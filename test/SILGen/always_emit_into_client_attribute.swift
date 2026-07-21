@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-testing -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package | %FileCheck %s --check-prefix=TESTING
 
 // CHECK-LABEL: sil non_abi [serialized] [export_implementation] [ossa] @$s33always_emit_into_client_attribute0A22EmitIntoClientFunctionyyF : $@convention(thin) () -> ()
 @_alwaysEmitIntoClient public func alwaysEmitIntoClientFunction() {
@@ -62,17 +63,21 @@ public final class C {
 
 
 // We drop AEIC if the containing context does not have effective public
-// visibility.
+// visibility. Under -enable-testing the access is raised to public, but AEIC
+// is still dropped because the decl is not serialized.
 internal struct InternalContext {
 // CHECK-LABEL: sil hidden [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
+// TESTING-LABEL: sil [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
   @_alwaysEmitIntoClient
   internal static var v : Int { 1 }
 }
 
 // We drop AEIC if the containing context does not have effective public
-// visibility.
+// visibility. Under -enable-testing the access is raised to public, but AEIC
+// is still dropped because the decl is not serialized.
 package struct PackageContext {
 // CHECK-LABEL: sil package [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
+// TESTING-LABEL: sil [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
 
   @_alwaysEmitIntoClient
   package static var v : Int { 1 }

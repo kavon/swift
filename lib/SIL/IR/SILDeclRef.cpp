@@ -763,7 +763,10 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     case Limit::None:
       return SILLinkage::Public;
     case Limit::AlwaysEmitIntoClient:
-      return SILLinkage::PublicNonABI;
+      if (isSerialized())
+        return SILLinkage::PublicNonABI;
+      else
+        return SILLinkage::Public;
     case Limit::OnDemand:
       return SILLinkage::Shared;
     case Limit::NeverPublic:
