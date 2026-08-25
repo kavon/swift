@@ -2455,6 +2455,12 @@ public:
                       ExtendLifetimeInst(getSILDebugLocation(Loc), Operand));
   }
 
+  DiagnoseInst *createDiagnose(SILLocation Loc, SILValue Operand,
+                               DiagnoseInst::DiagnoseKind Kind) {
+    return insert(new (getModule()) DiagnoseInst(getSILDebugLocation(Loc),
+                                                 Operand, Kind));
+  }
+
   UncheckedOwnershipConversionInst *
   createUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
                                      ValueOwnershipKind Kind) {
