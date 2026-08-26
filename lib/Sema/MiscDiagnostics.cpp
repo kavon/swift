@@ -36,6 +36,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1592,10 +1593,85 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
   }
 }
 
+// You can only consume storage.
+static DeferredDiags findSyntacticErrorForConsumeWithLifetimeResolution(
+    ModuleDecl *module, SourceLoc loc, Expr *subExpr) {
+  assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
+
+  DeferredDiags result;
+
+  Expr *current = subExpr;
+  while (current) {
+    if (isa<DeclRefExpr>(current)) {
+      // The chain of member_ref_exprs and load_exprs terminates at a
+      // declref_expr.  This is legal.
+      break;
+    }
+
+    // Look through loads.
+    if (auto *le = dyn_cast<LoadExpr>(current)) {
+      current = le->getSubExpr();
+      continue;
+    }
+
+    if (auto *mre = dyn_cast<MemberRefExpr>(current)) {
+      auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
+      if (!vd) {
+        result.emplace_back(loc, diag::consume_expression_non_storage);
+        break;
+      }
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
+        result.emplace_back(loc, diag::consume_expression_non_storage);
+        result.emplace_back(mre->getLoc(),
+                          diag::note_consume_expression_non_storage_property);
+        break;
+      }
+      current = mre->getBase();
+      continue;
+    }
+
+    // Look through tuples, as they're storage we track.
+    if (auto *tee = dyn_cast<TupleElementExpr>(current)) {
+      current = tee->getBase();
+      continue;
+    }
+
+    if (auto *ce = dyn_cast<CallExpr>(current)) {
+      result.emplace_back(loc, diag::consume_expression_non_storage);
+      result.emplace_back(ce->getLoc(),
+                          diag::note_consume_expression_non_storage_call);
+      break;
+    }
+
+
+    if (auto *se = dyn_cast<SubscriptExpr>(current)) {
+      result.emplace_back(loc, diag::consume_expression_non_storage);
+      result.emplace_back(se->getLoc(),
+                        diag::note_consume_expression_non_storage_subscript);
+      break;
+    }
+
+    // Catch-all to flag expressions we're not handling.
+    result.emplace_back(loc, diag::consume_expression_not_passed_lvalue);
+    break;
+  }
+  return result;
+}
+
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
+
+  // LifetimeResolution can handle more kinds of consumes, such as those on
+  // copyable types.
+  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
+    return findSyntacticErrorForConsumeWithLifetimeResolution(module, loc,
+                                                              subExpr);
+
 
   DeferredDiags result;
   const bool noncopyable =
